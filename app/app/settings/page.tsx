@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Save, Key, Shield, Mail } from 'lucide-react';
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const settings = useStore(state => state.settings);
   const setSettings = useStore(state => state.setSettings);
   const gmailAuth = useStore(state => state.gmailAuth);
@@ -21,6 +23,23 @@ export default function SettingsPage() {
   const [apolloPassword, setApolloPassword] = useState(settings.apolloPassword || '');
   const [hunterKey, setHunterKey] = useState(settings.hunterApiKey || '');
   const [openaiKey, setOpenaiKey] = useState(settings.openaiApiKey || '');
+
+  // Handle OAuth callback from Gmail
+  useEffect(() => {
+    const gmailConnected = searchParams.get('gmail');
+    const email = searchParams.get('email');
+
+    if (gmailConnected === 'connected' && email) {
+      setGmailAuth({
+        isAuthenticated: true,
+        userEmail: decodeURIComponent(email),
+      });
+      addToast(`Gmail connected as ${decodeURIComponent(email)}`, 'success');
+
+      // Clean up URL
+      window.history.replaceState({}, '', '/app/settings');
+    }
+  }, [searchParams, setGmailAuth, addToast]);
 
   const handleSaveAPI = () => {
     setSettings({
@@ -34,9 +53,14 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const handleConnectGmail = () => {
-    // In production, this would trigger OAuth flow
-    addToast('Gmail connection coming soon', 'info');
+  const handleConnectGmail = async () => {
+    try {
+      // Redirect to OAuth flow
+      window.location.href = '/api/auth/gmail';
+    } catch (error) {
+      console.error('[v0] Gmail OAuth error:', error);
+      addToast('Failed to connect Gmail', 'error');
+    }
   };
 
   return (
