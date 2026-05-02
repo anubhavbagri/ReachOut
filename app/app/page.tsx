@@ -49,11 +49,11 @@ export default function SearchPage() {
 
               <div className="flex items-center gap-2">
                 <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'table' | 'grid')}>
-                  <TabsList className="grid w-auto grid-cols-2">
-                    <TabsTrigger value="grid" size="sm">
+                  <TabsList className="grid w-auto grid-cols-2 h-8">
+                    <TabsTrigger value="grid" className="text-xs px-2">
                       <LayoutGrid className="w-4 h-4" />
                     </TabsTrigger>
-                    <TabsTrigger value="table" size="sm">
+                    <TabsTrigger value="table" className="text-xs px-2">
                       <List className="w-4 h-4" />
                     </TabsTrigger>
                   </TabsList>

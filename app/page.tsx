@@ -8,7 +8,7 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
+        <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold">
               R
@@ -68,7 +68,7 @@ export default function LandingPage() {
 
       {/* Stats Section */}
       <section className="py-16 border-t border-b border-border">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-primary mb-2">10M+</div>
@@ -92,7 +92,7 @@ export default function LandingPage() {
 
       {/* Features Section */}
       <section id="features" className="py-20 border-b border-border">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="text-center mb-16 space-y-3">
             <h2 className="text-3xl md:text-4xl font-bold">One workflow, endless possibilities</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -136,7 +136,7 @@ export default function LandingPage() {
 
       {/* How It Works Section */}
       <section id="how-it-works" className="py-20 border-b border-border">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="text-center mb-16 space-y-3">
             <h2 className="text-3xl md:text-4xl font-bold">Three simple steps</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -183,7 +183,7 @@ export default function LandingPage() {
 
       {/* Use Cases Section */}
       <section id="use-cases" className="py-20 border-b border-border">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="text-center mb-16 space-y-3">
             <h2 className="text-3xl md:text-4xl font-bold">Built for any sales motion</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -221,7 +221,7 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="py-20">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="bg-primary text-primary-foreground rounded-2xl p-12 md:p-16 text-center space-y-6">
             <h2 className="text-3xl md:text-4xl font-bold">Ready to transform your outreach?</h2>
             <p className="text-lg opacity-90 max-w-2xl mx-auto">
@@ -240,7 +240,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border bg-muted/30 py-12">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-3">
               <h4 className="font-semibold">Product</h4>

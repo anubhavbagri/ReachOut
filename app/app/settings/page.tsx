@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Suspense } from 'react';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -8,37 +9,48 @@ import { Input } from '@/components/ui/input';
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import { Save, Key, Shield, Mail } from 'lucide-react';
+import { GmailCallbackHandler } from '@/components/gmail-callback-handler';
 
 export default function SettingsPage() {
   const settings = useStore(state => state.settings);
   const setSettings = useStore(state => state.setSettings);
   const gmailAuth = useStore(state => state.gmailAuth);
-  const setGmailAuth = useStore(state => state.setGmailAuth);
   const addToast = useStore(state => state.addToast);
   const [saved, setSaved] = useState(false);
 
-  const [apolloKey, setApolloKey] = useState(settings.apolloApiKey || '');
+  const [apolloEmail, setApolloEmail] = useState(settings.apolloEmail || '');
+  const [apolloPassword, setApolloPassword] = useState(settings.apolloPassword || '');
   const [hunterKey, setHunterKey] = useState(settings.hunterApiKey || '');
   const [openaiKey, setOpenaiKey] = useState(settings.openaiApiKey || '');
 
   const handleSaveAPI = () => {
     setSettings({
-      apolloApiKey: apolloKey,
+      apolloEmail: apolloEmail,
+      apolloPassword: apolloPassword,
       hunterApiKey: hunterKey,
       openaiApiKey: openaiKey,
     });
     setSaved(true);
-    addToast('API keys saved', 'success');
+    addToast('Credentials saved', 'success');
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const handleConnectGmail = () => {
-    // In production, this would trigger OAuth flow
-    addToast('Gmail connection coming soon', 'info');
+  const handleConnectGmail = async () => {
+    try {
+      // Redirect to OAuth flow
+      window.location.href = '/api/auth/gmail';
+    } catch (error) {
+      console.error('[v0] Gmail OAuth error:', error);
+      addToast('Failed to connect Gmail', 'error');
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
+      {/* Handle Gmail OAuth callback */}
+      <Suspense fallback={null}>
+        <GmailCallbackHandler />
+      </Suspense>
       <div className="border-b border-border bg-card/50 p-6 space-y-4">
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">
@@ -56,15 +68,28 @@ export default function SettingsPage() {
 
           <FieldGroup>
             <Field>
-              <FieldLabel>Apollo.io API Key (optional)</FieldLabel>
+              <FieldLabel>Apollo.io Email</FieldLabel>
               <Input
-                type="password"
-                placeholder="Leave blank to use demo data"
-                value={apolloKey}
-                onChange={e => setApolloKey(e.target.value)}
+                type="email"
+                placeholder="your@email.com"
+                value={apolloEmail}
+                onChange={e => setApolloEmail(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Get your key from <a href="https://app.apollo.io/settings" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">apollo.io settings</a>
+                Your Apollo.io account email address
+              </p>
+            </Field>
+
+            <Field>
+              <FieldLabel>Apollo.io Password</FieldLabel>
+              <Input
+                type="password"
+                placeholder="Your Apollo.io password"
+                value={apolloPassword}
+                onChange={e => setApolloPassword(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank to use demo data. Never stored, only used for API authentication.
               </p>
             </Field>
 

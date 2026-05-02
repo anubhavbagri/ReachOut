@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { Empty } from '@/components/ui/empty';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 
 export default function CampaignsPage() {
   return (
@@ -14,11 +14,15 @@ export default function CampaignsPage() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6">
-        <Empty
-          icon="📧"
-          title="No campaigns yet"
-          description="Create your first campaign by searching for prospects and sending emails"
-        />
+        <Empty>
+          <EmptyHeader>
+            <div className="text-4xl mb-2">📧</div>
+            <EmptyTitle>No campaigns yet</EmptyTitle>
+            <EmptyDescription>
+              Create your first campaign by searching for prospects and sending emails
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     </div>
   );

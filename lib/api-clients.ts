@@ -58,15 +58,63 @@ const DEMO_PROSPECTS: Prospect[] = [
 ];
 
 export class ApolloClient {
-  private apiKey: string;
+  private email: string;
+  private password: string;
   private baseUrl = 'https://api.apollo.io/v1';
+  private sessionToken?: string;
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor(email: string, password: string) {
+    this.email = email;
+    this.password = password;
   }
 
+  /**
+   * Authenticate with Apollo.io using email/password
+   * Stores session token for subsequent API calls
+   */
+  async authenticate(): Promise<string> {
+    try {
+      const response = await axios.post<{ token: string }>(
+        `${this.baseUrl}/auth/login`,
+        {
+          email: this.email,
+          password: this.password,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.data.token) {
+        throw new Error('No token received from Apollo.io');
+      }
+
+      this.sessionToken = response.data.token;
+      return this.sessionToken;
+    } catch (error) {
+      console.error('[v0] Apollo authentication failed:', error);
+      throw new Error('Invalid Apollo.io credentials. Please check your email and password.');
+    }
+  }
+
+  /**
+   * Search for prospects using Apollo.io
+   * Automatically authenticates if session token is missing
+   */
   async searchProspects(query: SearchQuery): Promise<Prospect[]> {
     try {
+      // Ensure we have a valid session token
+      if (!this.sessionToken) {
+        this.sessionToken = await this.authenticate();
+      }
+
+      const token = this.sessionToken;
+      if (!token) {
+        throw new Error('Failed to obtain Apollo.io session token');
+      }
+
       const response = await axios.post<ApolloResponse>(
         `${this.baseUrl}/mixed_people/search`,
         {
@@ -80,7 +128,7 @@ export class ApolloClient {
           headers: {
             'Cache-Control': 'no-cache',
             'Content-Type': 'application/json',
-            'X-Api-Key': this.apiKey,
+            'Authorization': `Bearer ${token}`,
           },
         }
       );
@@ -101,7 +149,7 @@ export class ApolloClient {
         createdAt: new Date(),
       }));
     } catch (error) {
-      console.error('[v0] Apollo API error:', error);
+      console.error('[v0] Apollo search error:', error);
       throw error;
     }
   }
@@ -179,19 +227,20 @@ export async function demoSearch(query: SearchQuery): Promise<Prospect[]> {
 
 /**
  * Intelligent fallback chain for prospect search
- * 1. Try Apollo (best coverage)
- * 2. Try Hunter (email focus)
+ * 1. Try Apollo (best coverage) with email/password session auth
+ * 2. Try Hunter (email focus) with API key
  * 3. Fall back to demo data
  */
 export async function searchProspectsWithFallback(
   query: SearchQuery,
-  apolloKey?: string,
+  apolloEmail?: string,
+  apolloPassword?: string,
   hunterKey?: string
 ): Promise<Prospect[]> {
-  // Try Apollo first
-  if (apolloKey) {
+  // Try Apollo first with session-based authentication
+  if (apolloEmail && apolloPassword) {
     try {
-      const apollo = new ApolloClient(apolloKey);
+      const apollo = new ApolloClient(apolloEmail, apolloPassword);
       return await apollo.searchProspects(query);
     } catch (error) {
       console.warn('[v0] Apollo search failed, trying Hunter...');

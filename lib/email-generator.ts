@@ -57,7 +57,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no markdown:
       system: SYSTEM_PROMPT,
       prompt: userPrompt,
       temperature: 0.7,
-      maxTokens: 500,
+      maxOutputTokens: 500,
     });
 
     // Parse the response - handle potential JSON extraction

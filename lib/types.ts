@@ -126,7 +126,8 @@ export interface GmailMessage {
 }
 
 export interface AppSettings {
-  apolloApiKey?: string;
+  apolloEmail?: string;
+  apolloPassword?: string;
   hunterApiKey?: string;
   openaiApiKey?: string;
   googleApiKey?: string;
