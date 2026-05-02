@@ -22,20 +22,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get API keys from environment
-    const apolloKey = process.env.APOLLO_API_KEY;
+    // Get credentials from environment
+    const apolloEmail = process.env.APOLLO_EMAIL;
+    const apolloPassword = process.env.APOLLO_PASSWORD;
     const hunterKey = process.env.HUNTER_API_KEY;
     const demoMode = process.env.DEMO_MODE === 'true';
 
     // If demo mode, skip real API calls
-    if (demoMode && !apolloKey && !hunterKey) {
+    if (demoMode && !apolloEmail && !hunterKey) {
       console.log('[v0] Using demo mode for search');
     }
 
-    // Perform search with fallback chain
+    // Perform search with fallback chain (email/password for Apollo)
     const results = await searchProspectsWithFallback(
       body,
-      apolloKey,
+      apolloEmail,
+      apolloPassword,
       hunterKey
     );
 

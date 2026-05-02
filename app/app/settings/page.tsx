@@ -17,18 +17,20 @@ export default function SettingsPage() {
   const addToast = useStore(state => state.addToast);
   const [saved, setSaved] = useState(false);
 
-  const [apolloKey, setApolloKey] = useState(settings.apolloApiKey || '');
+  const [apolloEmail, setApolloEmail] = useState(settings.apolloEmail || '');
+  const [apolloPassword, setApolloPassword] = useState(settings.apolloPassword || '');
   const [hunterKey, setHunterKey] = useState(settings.hunterApiKey || '');
   const [openaiKey, setOpenaiKey] = useState(settings.openaiApiKey || '');
 
   const handleSaveAPI = () => {
     setSettings({
-      apolloApiKey: apolloKey,
+      apolloEmail: apolloEmail,
+      apolloPassword: apolloPassword,
       hunterApiKey: hunterKey,
       openaiApiKey: openaiKey,
     });
     setSaved(true);
-    addToast('API keys saved', 'success');
+    addToast('Credentials saved', 'success');
     setTimeout(() => setSaved(false), 3000);
   };
 
@@ -56,15 +58,28 @@ export default function SettingsPage() {
 
           <FieldGroup>
             <Field>
-              <FieldLabel>Apollo.io API Key (optional)</FieldLabel>
+              <FieldLabel>Apollo.io Email</FieldLabel>
               <Input
-                type="password"
-                placeholder="Leave blank to use demo data"
-                value={apolloKey}
-                onChange={e => setApolloKey(e.target.value)}
+                type="email"
+                placeholder="your@email.com"
+                value={apolloEmail}
+                onChange={e => setApolloEmail(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Get your key from <a href="https://app.apollo.io/settings" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">apollo.io settings</a>
+                Your Apollo.io account email address
+              </p>
+            </Field>
+
+            <Field>
+              <FieldLabel>Apollo.io Password</FieldLabel>
+              <Input
+                type="password"
+                placeholder="Your Apollo.io password"
+                value={apolloPassword}
+                onChange={e => setApolloPassword(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank to use demo data. Never stored, only used for API authentication.
               </p>
             </Field>
 
