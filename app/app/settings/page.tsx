@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { Suspense } from 'react';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,13 +9,12 @@ import { Input } from '@/components/ui/input';
 import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import { Save, Key, Shield, Mail } from 'lucide-react';
+import { GmailCallbackHandler } from '@/components/gmail-callback-handler';
 
 export default function SettingsPage() {
-  const searchParams = useSearchParams();
   const settings = useStore(state => state.settings);
   const setSettings = useStore(state => state.setSettings);
   const gmailAuth = useStore(state => state.gmailAuth);
-  const setGmailAuth = useStore(state => state.setGmailAuth);
   const addToast = useStore(state => state.addToast);
   const [saved, setSaved] = useState(false);
 
@@ -23,23 +22,6 @@ export default function SettingsPage() {
   const [apolloPassword, setApolloPassword] = useState(settings.apolloPassword || '');
   const [hunterKey, setHunterKey] = useState(settings.hunterApiKey || '');
   const [openaiKey, setOpenaiKey] = useState(settings.openaiApiKey || '');
-
-  // Handle OAuth callback from Gmail
-  useEffect(() => {
-    const gmailConnected = searchParams.get('gmail');
-    const email = searchParams.get('email');
-
-    if (gmailConnected === 'connected' && email) {
-      setGmailAuth({
-        isAuthenticated: true,
-        userEmail: decodeURIComponent(email),
-      });
-      addToast(`Gmail connected as ${decodeURIComponent(email)}`, 'success');
-
-      // Clean up URL
-      window.history.replaceState({}, '', '/app/settings');
-    }
-  }, [searchParams, setGmailAuth, addToast]);
 
   const handleSaveAPI = () => {
     setSettings({
@@ -65,6 +47,10 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Handle Gmail OAuth callback */}
+      <Suspense fallback={null}>
+        <GmailCallbackHandler />
+      </Suspense>
       <div className="border-b border-border bg-card/50 p-6 space-y-4">
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">
