@@ -43,26 +43,18 @@ export default function LandingPage() {
               Cold outreach that&apos;s actually personal
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground text-balance">
-              Find the right prospects, write personalized emails, and send at scale—all powered by AI
+              Find recruiters at any company, reveal their emails, write personalized AI emails, and send from your own Gmail
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <Link href="/app">
               <Button size="lg" className="gap-2">
-                Try for Free
+                Get Started
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
-            <a href="#demo" className="text-primary hover:text-primary/80 font-medium flex items-center gap-2">
-              Watch Demo
-              <ArrowRight className="w-4 h-4" />
-            </a>
           </div>
-
-          <p className="text-sm text-muted-foreground pt-4">
-            No credit card required. Start reaching out in minutes.
-          </p>
         </div>
       </section>
 
@@ -105,9 +97,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Target className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-bold">Smart Prospect Search</h3>
+              <h3 className="text-xl font-bold">Find Recruiters Instantly</h3>
               <p className="text-muted-foreground">
-                Find exactly who you need to reach. Search by title, company, location, or keywords.
+                Enter any company website and instantly surface their recruiters, talent acquisition specialists, and hiring managers via Apollo.
               </p>
             </Card>
 
@@ -115,9 +107,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
                 <Zap className="w-6 h-6 text-accent" />
               </div>
-              <h3 className="text-xl font-bold">AI-Powered Writing</h3>
+              <h3 className="text-xl font-bold">Reveal Emails & Write with AI</h3>
               <p className="text-muted-foreground">
-                Generate personalized subject lines and email bodies in seconds. Adjust tone with one click.
+                Click to reveal verified emails via Apollo, Hunter, or ContactOut. Then let AI write a personalized email in seconds.
               </p>
             </Card>
 
@@ -125,9 +117,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center">
                 <Mail className="w-6 h-6 text-secondary" />
               </div>
-              <h3 className="text-xl font-bold">Send at Scale</h3>
+              <h3 className="text-xl font-bold">Send from Gmail & Track Follow-ups</h3>
               <p className="text-muted-foreground">
-                Send to hundreds of prospects with automatic rate limiting and Gmail integration.
+                Send bulk emails directly from your personal Gmail. Follow-ups tracker keeps you on top of who to nudge next.
               </p>
             </Card>
           </div>
@@ -148,18 +140,18 @@ export default function LandingPage() {
             {[
               {
                 number: '1',
-                title: 'Search & Filter',
-                description: 'Find prospects using powerful filters: job title, company size, industry, location, and more.',
+                title: 'Enter Company Website',
+                description: 'Paste any company URL. ReachOut finds all their recruiters and TA specialists instantly via Apollo.',
               },
               {
                 number: '2',
-                title: 'Generate Emails',
-                description: 'Let AI write personalized, conversion-focused emails for each prospect in your selection.',
+                title: 'Reveal Email & Personalize',
+                description: 'Click to reveal a verified email, then generate a personalized cold email with one click using AI.',
               },
               {
                 number: '3',
-                title: 'Send & Track',
-                description: 'Send directly via Gmail with automatic rate limiting, delivery tracking, and reply detection.',
+                title: 'Send & Follow Up',
+                description: 'Send directly from your Gmail. Follow-ups tracker shows who to nudge after 3+ days of no reply.',
               },
             ].map((step, idx) => (
               <div key={idx} className="relative">
@@ -223,17 +215,16 @@ export default function LandingPage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="bg-primary text-primary-foreground rounded-2xl p-12 md:p-16 text-center space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">Ready to transform your outreach?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold">Ready to land your next opportunity?</h2>
             <p className="text-lg opacity-90 max-w-2xl mx-auto">
-              Join hundreds of teams using ReachOut to book more meetings and close more deals
+              Your personal cold-outreach agent — find the recruiter, reveal the email, send from Gmail
             </p>
             <Link href="/app">
               <Button size="lg" className="gap-2 bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                Get Started Free
+                Get Started
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
-            <p className="text-sm opacity-75">No credit card required. Start in minutes.</p>
           </div>
         </div>
       </section>

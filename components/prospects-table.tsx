@@ -61,7 +61,11 @@ export function ProspectsTable({ prospects }: ProspectsTableProps) {
               <td className="px-4 py-3 text-muted-foreground">{prospect.title}</td>
               <td className="px-4 py-3 text-muted-foreground">{prospect.company}</td>
               <td className="px-4 py-3 text-muted-foreground truncate max-w-xs">
-                {prospect.email}
+                {prospect.email ? (
+                  <span className="text-green-600 dark:text-green-400 font-medium">{prospect.email}</span>
+                ) : (
+                  <span className="text-muted-foreground/50 text-xs italic">Not revealed — use card view</span>
+                )}
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {prospect.location || '-'}

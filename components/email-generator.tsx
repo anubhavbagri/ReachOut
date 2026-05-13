@@ -29,11 +29,11 @@ export function EmailGenerator({
   };
 
   return (
-    <Card className="p-8 max-w-2xl space-y-6">
+    <Card className="p-4 md:p-8 max-w-2xl space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Generate Personalized Emails</h2>
+        <h2 className="text-xl md:text-2xl font-bold">Generate Personalized Emails</h2>
         <p className="text-muted-foreground">
-          Our AI will write personalized emails for all {prospectCount} prospects based on the context you provide.
+          Gemini will write personalized emails for all {prospectCount} people based on the context you provide.
         </p>
       </div>
 

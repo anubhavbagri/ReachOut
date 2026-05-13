@@ -1,283 +1,246 @@
 /**
- * API Client Initialization
- * Handles Apollo, Hunter, and fallback configurations
+ * API Clients
+ * Apollo (API key header auth), Hunter, ContactOut
  */
 
 import axios from 'axios';
-import { ApolloResponse, HunterResponse, SearchQuery, Prospect } from './types';
+import { Prospect } from './types';
 
-const DEMO_PROSPECTS: Prospect[] = [
-  {
-    id: 'demo-1',
-    firstName: 'Sarah',
-    lastName: 'Chen',
-    email: 'sarah.chen@techcorp.com',
-    company: 'TechCorp',
-    title: 'VP of Product',
-    linkedin: 'linkedin.com/in/sarahchen',
-    website: 'techcorp.com',
-    location: 'San Francisco, CA',
-    industry: 'Technology',
-    score: 92,
-    source: 'apollo',
-    createdAt: new Date(),
-    notes: 'Active in SaaS community, writes on product strategy',
-  },
-  {
-    id: 'demo-2',
-    firstName: 'Marcus',
-    lastName: 'Rodriguez',
-    email: 'marcus.r@innovateLabs.io',
-    company: 'Innovate Labs',
-    title: 'Founder & CEO',
-    linkedin: 'linkedin.com/in/mrodriguez',
-    website: 'innovatelabs.io',
-    location: 'Austin, TX',
-    industry: 'Technology',
-    score: 88,
-    source: 'hunter',
-    createdAt: new Date(),
-    notes: 'Early stage funded, looking for partnerships',
-  },
-  {
-    id: 'demo-3',
-    firstName: 'Jennifer',
-    lastName: 'Park',
-    email: 'jpark@enterprises.com',
-    company: 'Global Enterprises Inc',
-    title: 'Chief Technology Officer',
-    linkedin: 'linkedin.com/in/jenniferpark',
-    website: 'enterprises.com',
-    location: 'New York, NY',
-    industry: 'Enterprise Software',
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+export function normalizeDomain(input: string): string {
+  return input
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0]
+    .split('?')[0]
+    .toLowerCase();
+}
+
+export function isValidDomain(input: string): boolean {
+  const domain = normalizeDomain(input);
+  // Must contain at least one dot and no spaces
+  return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/.test(domain);
+}
+
+// ─── Apollo People Search ────────────────────────────────────────────────────
+
+export interface ApolloPersonRaw {
+  id: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  title?: string;
+  email?: string;
+  linkedin_url?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  organization?: {
+    id?: string;
+    name?: string;
+    website_url?: string;
+    primary_domain?: string;
+    industry?: string;
+  };
+}
+
+export interface ApolloSearchResponse {
+  people: ApolloPersonRaw[];
+  contacts?: ApolloPersonRaw[];
+  pagination?: {
+    page: number;
+    per_page: number;
+    total_entries: number;
+  };
+}
+
+export const DEFAULT_PERSON_TITLES = [
+  'recruiter',
+  'talent',
+  'people',
+  'culture',
+  'hiring',
+  'HR',
+  'talent acquisition specialist',
+  'tech recruiter',
+  'talent acquisition',
+];
+
+// contact_email_status values — hardcoded, not shown in UI
+const CONTACT_EMAIL_STATUSES = ['verified', 'unverified', 'user managed', 'update required'];
+
+/**
+ * POST /v1/people/search — search by company domain
+ * API key goes in the header as X-Api-Key
+ */
+export async function apolloSearchByDomain(
+  domain: string,
+  apiKey: string,
+  personTitles: string[] = DEFAULT_PERSON_TITLES,
+  perPage = 25
+): Promise<Prospect[]> {
+  const response = await axios.post<ApolloSearchResponse>(
+    'https://api.apollo.io/v1/people/search',
+    {
+      q_organization_domains_list: [domain],
+      person_titles: personTitles,
+      contact_email_status: CONTACT_EMAIL_STATUSES,
+      per_page: perPage,
+      page: 1,
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+    }
+  );
+
+  const people = response.data.people || response.data.contacts || [];
+
+  return people.map((p): Prospect => ({
+    id: p.id,
+    firstName: p.first_name,
+    lastName: p.last_name,
+    email: undefined, // revealed separately
+    company: p.organization?.name || domain,
+    title: p.title || '',
+    linkedin: p.linkedin_url,
+    website: p.organization?.website_url || `https://${domain}`,
+    location: [p.city, p.state, p.country].filter(Boolean).join(', ') || undefined,
+    industry: p.organization?.industry,
     score: 85,
     source: 'apollo',
     createdAt: new Date(),
-    notes: 'Known for modernizing legacy systems',
-  },
-];
-
-export class ApolloClient {
-  private email: string;
-  private password: string;
-  private baseUrl = 'https://api.apollo.io/v1';
-  private sessionToken?: string;
-
-  constructor(email: string, password: string) {
-    this.email = email;
-    this.password = password;
-  }
-
-  /**
-   * Authenticate with Apollo.io using email/password
-   * Stores session token for subsequent API calls
-   */
-  async authenticate(): Promise<string> {
-    try {
-      const response = await axios.post<{ token: string }>(
-        `${this.baseUrl}/auth/login`,
-        {
-          email: this.email,
-          password: this.password,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.data.token) {
-        throw new Error('No token received from Apollo.io');
-      }
-
-      this.sessionToken = response.data.token;
-      return this.sessionToken;
-    } catch (error) {
-      console.error('[v0] Apollo authentication failed:', error);
-      throw new Error('Invalid Apollo.io credentials. Please check your email and password.');
-    }
-  }
-
-  /**
-   * Search for prospects using Apollo.io
-   * Automatically authenticates if session token is missing
-   */
-  async searchProspects(query: SearchQuery): Promise<Prospect[]> {
-    try {
-      // Ensure we have a valid session token
-      if (!this.sessionToken) {
-        this.sessionToken = await this.authenticate();
-      }
-
-      const token = this.sessionToken;
-      if (!token) {
-        throw new Error('Failed to obtain Apollo.io session token');
-      }
-
-      const response = await axios.post<ApolloResponse>(
-        `${this.baseUrl}/mixed_people/search`,
-        {
-          q_keywords: query.keywords.join(' '),
-          person_title: query.title,
-          organization_name: query.company,
-          person_locations: query.location ? [query.location] : [],
-          limit: query.limit || 10,
-        },
-        {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      return response.data.people.map(p => ({
-        id: p.id,
-        firstName: p.first_name,
-        lastName: p.last_name,
-        email: p.email,
-        company: p.company_name,
-        title: p.title,
-        linkedin: p.linkedin_url,
-        website: p.company_website,
-        location: p.location,
-        industry: p.industry,
-        score: 85,
-        source: 'apollo' as const,
-        createdAt: new Date(),
-      }));
-    } catch (error) {
-      console.error('[v0] Apollo search error:', error);
-      throw error;
-    }
-  }
+  }));
 }
 
-export class HunterClient {
-  private apiKey: string;
-  private baseUrl = 'https://api.hunter.io/v2';
+// ─── Apollo People Enrichment (reveal email) ─────────────────────────────────
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  async searchProspects(query: SearchQuery): Promise<Prospect[]> {
-    try {
-      const params = new URLSearchParams({
-        domain: query.company || '',
-        limit: String(query.limit || 10),
-        api_key: this.apiKey,
-      });
-
-      const response = await axios.get<HunterResponse>(
-        `${this.baseUrl}/domain/search?${params.toString()}`
-      );
-
-      return response.data.data.map(p => ({
-        id: p.id,
-        firstName: p.first_name,
-        lastName: p.last_name,
-        email: p.email,
-        company: p.company.name,
-        title: p.position,
-        linkedin: undefined,
-        website: p.company.website,
-        location: p.location,
-        score: 80,
-        source: 'hunter' as const,
-        createdAt: new Date(),
-      }));
-    } catch (error) {
-      console.error('[v0] Hunter API error:', error);
-      throw error;
-    }
-  }
+export interface ApolloEnrichResponse {
+  person: {
+    id: string;
+    email?: string;
+    email_status?: string;
+  };
 }
 
 /**
- * Fallback search using demo data
- * Used when API credentials aren't available or requests fail
+ * POST /v1/people/match — enrich person to get email
+ * Passing the Apollo person ID reveals their email
  */
-export async function demoSearch(query: SearchQuery): Promise<Prospect[]> {
-  // Simulate API latency
-  await new Promise(resolve => setTimeout(resolve, 300));
+export async function apolloRevealEmail(
+  prospectId: string,
+  apiKey: string
+): Promise<string | null> {
+  const response = await axios.post<ApolloEnrichResponse>(
+    'https://api.apollo.io/v1/people/match',
+    {
+      id: prospectId,
+      reveal_personal_emails: true,
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+      },
+    }
+  );
+  return response.data?.person?.email || null;
+}
 
-  const keywords = query.keywords.map(k => k.toLowerCase());
-  const title = query.title?.toLowerCase();
-  const company = query.company?.toLowerCase();
+// ─── Hunter Email Finder ─────────────────────────────────────────────────────
 
-  return DEMO_PROSPECTS.filter(p => {
-    const matchesKeywords = keywords.some(
-      k =>
-        p.firstName.toLowerCase().includes(k) ||
-        p.lastName.toLowerCase().includes(k) ||
-        p.company.toLowerCase().includes(k) ||
-        p.title.toLowerCase().includes(k)
-    );
+export interface HunterEmailFinderResponse {
+  data: {
+    email: string | null;
+    score: number;
+    position?: string;
+    first_name?: string;
+    last_name?: string;
+    sources?: Array<{ domain: string; uri: string }>;
+  };
+}
 
-    const matchesTitle = !title || p.title.toLowerCase().includes(title);
-    const matchesCompany =
-      !company || p.company.toLowerCase().includes(company);
-
-    return matchesKeywords && matchesTitle && matchesCompany;
+/**
+ * GET /v2/email-finder — find a specific person's email by name + domain
+ */
+export async function hunterFindEmail(
+  firstName: string,
+  lastName: string,
+  domain: string,
+  apiKey: string
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    domain,
+    first_name: firstName,
+    last_name: lastName,
+    api_key: apiKey,
   });
+  const response = await axios.get<HunterEmailFinderResponse>(
+    `https://api.hunter.io/v2/email-finder?${params.toString()}`
+  );
+  return response.data?.data?.email || null;
+}
+
+// ─── ContactOut Contact Info ─────────────────────────────────────────────────
+
+export interface ContactOutResponse {
+  profile?: {
+    emails?: Array<{ email: string; type?: string }> | string[];
+    work_email?: string;
+    personal_email?: string;
+  };
 }
 
 /**
- * Intelligent fallback chain for prospect search
- * 1. Try Apollo (best coverage) with email/password session auth
- * 2. Try Hunter (email focus) with API key
- * 3. Fall back to demo data
+ * GET /api/v2/contact/info — get contact info by LinkedIn URL
+ * Authorization: Token <apiKey>
  */
-export async function searchProspectsWithFallback(
-  query: SearchQuery,
-  apolloEmail?: string,
-  apolloPassword?: string,
-  hunterKey?: string
-): Promise<Prospect[]> {
-  // Try Apollo first with session-based authentication
-  if (apolloEmail && apolloPassword) {
-    try {
-      const apollo = new ApolloClient(apolloEmail, apolloPassword);
-      return await apollo.searchProspects(query);
-    } catch (error) {
-      console.warn('[v0] Apollo search failed, trying Hunter...');
+export async function contactOutFindEmail(
+  linkedinUrl: string,
+  apiKey: string
+): Promise<string | null> {
+  // Normalize LinkedIn URL
+  const url = linkedinUrl.startsWith('http') ? linkedinUrl : `https://${linkedinUrl}`;
+
+  const response = await axios.get<ContactOutResponse>(
+    'https://api.contactout.com/v2/contact/info',
+    {
+      params: { linkedin: url },
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
     }
-  }
+  );
 
-  // Try Hunter
-  if (hunterKey && query.company) {
-    try {
-      const hunter = new HunterClient(hunterKey);
-      return await hunter.searchProspects(query);
-    } catch (error) {
-      console.warn('[v0] Hunter search failed, using demo data...');
-    }
-  }
+  const profile = response.data?.profile;
+  if (!profile) return null;
 
-  // Fall back to demo
-  return demoSearch(query);
+  // Prefer work email, then first email in array
+  if (profile.work_email) return profile.work_email;
+  if (profile.personal_email) return profile.personal_email;
+
+  const emails = profile.emails;
+  if (!emails || emails.length === 0) return null;
+
+  const first = emails[0];
+  if (typeof first === 'string') return first;
+  return (first as { email: string }).email || null;
 }
 
-/**
- * Validate email address format
- */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
+// ─── Sanitize ────────────────────────────────────────────────────────────────
 
-/**
- * Sanitize prospect data
- */
 export function sanitizeProspect(prospect: Partial<Prospect>): Prospect {
   return {
     id: prospect.id || '',
     firstName: (prospect.firstName || '').trim(),
     lastName: (prospect.lastName || '').trim(),
-    email: (prospect.email || '').toLowerCase().trim(),
+    email: prospect.email ? prospect.email.toLowerCase().trim() : undefined,
     company: (prospect.company || '').trim(),
     title: (prospect.title || '').trim(),
     linkedin: prospect.linkedin?.trim(),
@@ -289,4 +252,8 @@ export function sanitizeProspect(prospect: Partial<Prospect>): Prospect {
     createdAt: prospect.createdAt || new Date(),
     notes: prospect.notes?.trim(),
   };
+}
+
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

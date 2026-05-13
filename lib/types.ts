@@ -1,30 +1,27 @@
 /**
  * ReachOut Type Definitions
- * Core types for prospect research, email generation, and Gmail integration
  */
 
 export interface Prospect {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string; // Revealed via Apollo / Hunter / ContactOut CTAs
   company: string;
   title: string;
   linkedin?: string;
   website?: string;
   location?: string;
   industry?: string;
-  score: number; // Relevance score 0-100
-  source: 'apollo' | 'hunter' | 'manual';
+  score: number;
+  source: 'apollo' | 'hunter' | 'contactout' | 'manual';
   createdAt: Date;
   notes?: string;
 }
 
 export interface SearchQuery {
-  keywords: string[];
-  title?: string;
-  company?: string;
-  location?: string;
+  websiteUrl: string;
+  personTitles?: string[];
   limit?: number;
 }
 
@@ -32,7 +29,7 @@ export interface EmailTemplate {
   id: string;
   subject: string;
   body: string;
-  variables: string[]; // e.g., ['firstName', 'company', 'personalDetail']
+  variables: string[];
   tone: 'professional' | 'friendly' | 'casual';
 }
 
@@ -44,60 +41,6 @@ export interface GeneratedEmail {
   body: string;
   generatedAt: Date;
   status: 'draft' | 'pending' | 'sent' | 'bounced';
-}
-
-export interface BulkEmailRequest {
-  prospectIds: string[];
-  templateId: string;
-  subject: string;
-  body: string;
-  sendAt?: Date;
-  delayMs?: number; // Rate limiting delay between sends
-}
-
-export interface ApolloResponse {
-  people: ApolloProspect[];
-  pagination: {
-    page: number;
-    per_page: number;
-    total_entries: number;
-  };
-}
-
-export interface ApolloProspect {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  title: string;
-  company_name: string;
-  company_website?: string;
-  linkedin_url?: string;
-  location: string;
-  industry?: string;
-}
-
-export interface HunterResponse {
-  data: HunterProspect[];
-  meta: {
-    results: number;
-    limit: number;
-    offset: number;
-  };
-}
-
-export interface HunterProspect {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  position: string;
-  company: {
-    name: string;
-    website?: string;
-    linkedin_url?: string;
-  };
-  location?: string;
 }
 
 export interface AIProviderConfig {
@@ -114,26 +57,15 @@ export interface GmailAuthState {
   userEmail?: string;
 }
 
-export interface GmailMessage {
-  id: string;
-  threadId: string;
-  from: string;
-  to: string;
-  subject: string;
-  body: string;
-  timestamp: Date;
-  isRead: boolean;
-}
-
 export interface AppSettings {
-  apolloEmail?: string;
-  apolloPassword?: string;
+  apolloApiKey?: string;
   hunterApiKey?: string;
+  contactOutApiKey?: string;
   openaiApiKey?: string;
   googleApiKey?: string;
-  demoMode: boolean;
   defaultAIProvider: 'openai' | 'google';
-  emailDelayMs: number; // Default rate limiting
+  emailDelayMs: number;
+  personTitles: string[]; // Editable list shown in search form
 }
 
 export interface SearchState {
@@ -163,4 +95,32 @@ export interface ToastNotification {
   type: 'success' | 'error' | 'info' | 'warning';
   message: string;
   duration?: number;
+}
+
+// Follow-up tracking
+export interface SentEmail {
+  id: string;
+  prospectId: string;
+  prospectName: string;
+  prospectEmail: string;
+  prospectCompany: string;
+  prospectTitle: string;
+  subject: string;
+  body: string;
+  sentAt: Date;
+  followUpStatus: 'pending' | 'followed_up' | 'replied' | 'not_interested';
+  followUpCount: number;
+  lastFollowUpAt?: Date;
+  notes?: string;
+  gmailThreadId?: string;
+}
+
+// Email list for bulk sending — prospects whose emails have been revealed
+export interface EmailListEntry {
+  prospectId: string;
+  prospectName: string;
+  prospectEmail: string;
+  prospectCompany: string;
+  prospectTitle: string;
+  addedAt: Date;
 }

@@ -1,13 +1,9 @@
 /**
- * GET /api/mcp/gmail
- * Gmail MCP Server - Exposes Gmail tools for AI agents
+ * POST /api/mcp/gmail
+ * Gmail send endpoint — uses OAuth refresh token to send real emails via Gmail API
  * 
- * This is a publicly discoverable MCP server that allows:
- * - Sending emails
- * - Reading threads
- * - Checking send status
- * 
- * The AI agent can call these tools as part of email sending workflow.
+ * This runs as a Next.js API route on Vercel (serverless).
+ * The refresh token is obtained via /api/auth/gmail OAuth flow.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,168 +11,142 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-export async function GET(request: NextRequest) {
-  try {
-    // MCP spec requires server info endpoint
-    const origin = request.headers.get('origin') || request.nextUrl.origin;
-
-    return NextResponse.json({
-      name: 'gmail-mcp',
-      version: '1.0.0',
-      description: 'Gmail MCP server for cold email automation',
-      capabilities: {
-        tools: true,
-      },
-      tools: [
-        {
-          name: 'send_email',
-          description: 'Send an email via Gmail with specified subject and body',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              to: {
-                type: 'string',
-                description: 'Recipient email address',
-              },
-              subject: {
-                type: 'string',
-                description: 'Email subject line',
-              },
-              body: {
-                type: 'string',
-                description: 'Email body text (plain text)',
-              },
-              refreshToken: {
-                type: 'string',
-                description: 'Gmail OAuth refresh token',
-              },
-            },
-            required: ['to', 'subject', 'body', 'refreshToken'],
-          },
-        },
-        {
-          name: 'get_thread',
-          description: 'Retrieve a Gmail thread by ID',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              threadId: {
-                type: 'string',
-                description: 'Gmail thread ID',
-              },
-              refreshToken: {
-                type: 'string',
-                description: 'Gmail OAuth refresh token',
-              },
-            },
-            required: ['threadId', 'refreshToken'],
-          },
-        },
-        {
-          name: 'check_send_status',
-          description: 'Check if an email was successfully sent',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              messageId: {
-                type: 'string',
-                description: 'Gmail message ID',
-              },
-              refreshToken: {
-                type: 'string',
-                description: 'Gmail OAuth refresh token',
-              },
-            },
-            required: ['messageId', 'refreshToken'],
-          },
-        },
-      ],
-      authentication: {
-        type: 'oauth2',
-        provider: 'google',
-      },
-    });
-  } catch (error) {
-    console.error('[v0] MCP server error:', error);
-
-    return NextResponse.json(
-      {
-        error: 'MCP server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  error?: string;
 }
 
+/**
+ * Exchange refresh token for a fresh access token
+ */
+async function getAccessToken(refreshToken: string): Promise<string> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+
+  const data = (await res.json()) as TokenResponse;
+  if (data.error || !data.access_token) {
+    throw new Error(`Failed to refresh token: ${data.error}`);
+  }
+  return data.access_token;
+}
+
+/**
+ * Encode an email message in RFC 2822 format (base64url)
+ */
+function encodeEmail(to: string, from: string, subject: string, body: string): string {
+  const message = [
+    `To: ${to}`,
+    `From: ${from}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    body,
+  ].join('\r\n');
+
+  return Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/**
+ * GET — server info / health check
+ */
+export async function GET() {
+  return NextResponse.json({
+    name: 'gmail-sender',
+    version: '2.0.0',
+    status: 'ready',
+    description: 'Sends emails via Gmail API using OAuth2 refresh tokens',
+  });
+}
+
+/**
+ * POST — send email(s)
+ * Body: { refreshToken, to, subject, body, fromEmail? }
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as {
-      tool: string;
-      input: Record<string, unknown>;
+      refreshToken: string;
+      to: string;
+      subject: string;
+      body: string;
+      fromEmail?: string;
     };
 
-    const { tool, input } = body;
+    const { refreshToken, to, subject, body: emailBody, fromEmail } = body;
 
-    // Handle different tool calls
-    switch (tool) {
-      case 'send_email':
-        return handleSendEmail(input);
-
-      case 'get_thread':
-        return handleGetThread(input);
-
-      case 'check_send_status':
-        return handleCheckSendStatus(input);
-
-      default:
-        return NextResponse.json(
-          { error: `Unknown tool: ${tool}` },
-          { status: 400 }
-        );
+    if (!refreshToken || !to || !subject || !emailBody) {
+      return NextResponse.json(
+        { error: 'Missing required fields: refreshToken, to, subject, body' },
+        { status: 400 }
+      );
     }
-  } catch (error) {
-    console.error('[v0] MCP tool error:', error);
 
-    return NextResponse.json(
+    // 1. Get fresh access token
+    const accessToken = await getAccessToken(refreshToken);
+
+    // 2. Get sender's email address if not provided
+    let senderEmail = fromEmail;
+    if (!senderEmail) {
+      const profileRes = await fetch(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const profile = await profileRes.json() as { email: string };
+      senderEmail = profile.email;
+    }
+
+    // 3. Build and send the email
+    const raw = encodeEmail(to, senderEmail, subject, emailBody);
+
+    const sendRes = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
       {
-        error: 'Tool execution failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw }),
+      }
     );
-  }
-}
 
-async function handleSendEmail(input: Record<string, unknown>) {
-  const { to, subject, body, refreshToken } = input as {
-    to: string;
-    subject: string;
-    body: string;
-    refreshToken: string;
-  };
+    if (!sendRes.ok) {
+      const err = await sendRes.json();
+      console.error('[ReachOut] Gmail send error:', err);
+      return NextResponse.json(
+        { error: 'Gmail API error', details: err },
+        { status: sendRes.status }
+      );
+    }
 
-  // Validate inputs
-  if (!to || !subject || !body || !refreshToken) {
-    return NextResponse.json(
-      { error: 'Missing required fields' },
-      { status: 400 }
-    );
-  }
-
-  try {
-    // In production, use Google API to send email
-    // For now, return mock success
-    console.log(`[v0] Sending email to ${to}`);
+    const result = await sendRes.json() as { id: string; threadId: string };
 
     return NextResponse.json({
       success: true,
-      messageId: `mock-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      messageId: result.id,
+      threadId: result.threadId,
+      sentAt: new Date().toISOString(),
       to,
       subject,
+      fromEmail: senderEmail,
     });
   } catch (error) {
+    console.error('[ReachOut] Send email error:', error);
     return NextResponse.json(
       {
         error: 'Failed to send email',
@@ -185,54 +155,4 @@ async function handleSendEmail(input: Record<string, unknown>) {
       { status: 500 }
     );
   }
-}
-
-async function handleGetThread(input: Record<string, unknown>) {
-  const { threadId, refreshToken } = input as {
-    threadId: string;
-    refreshToken: string;
-  };
-
-  if (!threadId || !refreshToken) {
-    return NextResponse.json(
-      { error: 'Missing required fields' },
-      { status: 400 }
-    );
-  }
-
-  // Mock thread data
-  return NextResponse.json({
-    success: true,
-    threadId,
-    messages: [
-      {
-        id: 'mock-msg-1',
-        from: 'prospect@company.com',
-        subject: 'RE: Quick thought',
-        body: 'This sounds interesting, let me know more',
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  });
-}
-
-async function handleCheckSendStatus(input: Record<string, unknown>) {
-  const { messageId, refreshToken } = input as {
-    messageId: string;
-    refreshToken: string;
-  };
-
-  if (!messageId || !refreshToken) {
-    return NextResponse.json(
-      { error: 'Missing required fields' },
-      { status: 400 }
-    );
-  }
-
-  return NextResponse.json({
-    success: true,
-    messageId,
-    status: 'sent',
-    sentAt: new Date().toISOString(),
-  });
 }

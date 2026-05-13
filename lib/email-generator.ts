@@ -1,170 +1,226 @@
 /**
- * AI Email Generation
- * Uses OpenAI/Gemini to draft personalized cold emails
+ * AI Email Generation — Google Gemini only
+ * The API key is passed explicitly from the user's Settings (stored in localStorage).
+ * This allows the key to be configured entirely via the Settings UI — no .env needed.
  */
 
 import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
-import { google } from '@ai-sdk/google';
-import { Prospect } from './types';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
-const SYSTEM_PROMPT = `You are an expert at writing personalized cold outreach emails that:
-- Start with a genuine, specific compliment or observation about the person/company
-- Clearly state your value proposition in 1-2 sentences
-- Include ONE specific, relevant piece of information about them
-- End with a low-pressure CTA (suggest a 15-min call, not a full demo)
-- Keep subject lines under 50 characters
-- Keep email body under 150 words
-- Sound natural and conversational, not salesy
-- Avoid overpromising or using hype language`;
+export type EmailTone = 'professional' | 'friendly' | 'casual';
 
-export async function generateEmail(
-  prospect: Prospect,
-  context: string,
-  tone: 'professional' | 'friendly' | 'casual' = 'professional',
-  aiProvider: 'openai' | 'google' = 'openai'
-) {
-  const model = aiProvider === 'openai' ? openai('gpt-4o-mini') : google('gemini-1.5-flash');
-
-  const toneGuidance = {
-    professional: 'Keep a formal, business-appropriate tone.',
-    friendly: 'Be warm and personable, like talking to a colleague.',
-    casual: 'Sound conversational and relaxed, almost like a peer reaching out.',
-  };
-
-  const userPrompt = `
-Write a cold outreach email to this prospect:
-
-Name: ${prospect.firstName} ${prospect.lastName}
-Title: ${prospect.title}
-Company: ${prospect.company}
-Location: ${prospect.location || 'Unknown'}
-Industry: ${prospect.industry || 'Unknown'}
-Context/Notes: ${context}
-
-Tone: ${toneGuidance[tone]}
-
-IMPORTANT: Return ONLY valid JSON in this exact format, no markdown:
-{
-  "subject": "subject line here",
-  "body": "email body here"
+export interface ProspectForEmail {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  company: string;
+  title?: string;
+  location?: string;
+  industry?: string;
+  website?: string;
 }
-`;
 
-  try {
-    const result = await generateText({
-      model,
-      system: SYSTEM_PROMPT,
-      prompt: userPrompt,
-      temperature: 0.7,
-      maxOutputTokens: 500,
-    });
+const SYSTEM_PROMPT = `You are an expert at writing short, genuine cold outreach emails for job seekers reaching out to recruiters and hiring managers. Your emails:
+- Open with a specific, non-generic observation about the person or their company
+- State the sender's value proposition in 1-2 punchy sentences
+- End with a low-pressure, specific CTA (15-min call, coffee chat)
+- Keep the subject under 50 characters
+- Keep the body under 120 words
+- Sound human, warm, and conversational — not salesy or templated
+- Never use buzzwords like "synergy", "leverage", "circle back"
 
-    // Parse the response - handle potential JSON extraction
-    let jsonStr = result.text.trim();
-    
-    // If wrapped in markdown code blocks, extract
-    const jsonMatch = jsonStr.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
+You MUST return ONLY a valid JSON object — no markdown fences, no extra text:
+{"subject": "...", "body": "..."}`;
 
-    const parsed = JSON.parse(jsonStr);
+function getGeminiModel(apiKey?: string) {
+  // Prefer the explicitly passed key (from Settings UI / localStorage).
+  // Fall back to server env var (for API routes running on Vercel).
+  const key = apiKey
+    || process.env.GOOGLE_API_KEY
+    || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
-    return {
-      subject: parsed.subject || '(Error parsing subject)',
-      body: parsed.body || '(Error parsing body)',
-    };
-  } catch (error) {
-    console.error('[v0] Email generation error:', error);
-    
-    // Fallback to template if AI fails
-    return {
-      subject: `Quick thought about ${prospect.company}`,
-      body: `Hi ${prospect.firstName},
+  if (!key) {
+    throw new Error('Gemini API key not configured. Add it in Settings → Google Gemini API Key.');
+  }
 
-I noticed ${prospect.company} is doing some interesting work in the ${prospect.industry} space.
+  const google = createGoogleGenerativeAI({ apiKey: key });
+  return google('gemini-1.5-flash');
+}
 
-Would love to grab a quick 15-min call to explore how we might help.
+function parseGeminiJSON(text: string): { subject: string; body: string } {
+  let t = text.trim();
+  // Strip markdown fences
+  const fenced = t.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  if (fenced) t = fenced[1].trim();
+  const parsed = JSON.parse(t);
+  return {
+    subject: String(parsed.subject || '').trim(),
+    body: String(parsed.body || '').trim(),
+  };
+}
+
+function fallbackEmail(prospect: ProspectForEmail): { subject: string; body: string } {
+  return {
+    subject: `Exploring opportunities at ${prospect.company}`,
+    body: `Hi ${prospect.firstName},
+
+I came across ${prospect.company} and was genuinely impressed by what you're building.
+
+I'm a [your role] with experience in [your domain], and I'd love to explore whether there's a fit.
+
+Would you have 15 minutes for a quick chat?
 
 Best,
 [Your name]`,
-    };
+  };
+}
+
+// ─── Single email ────────────────────────────────────────────────────────────
+
+export async function generateEmail(
+  prospect: ProspectForEmail,
+  context: string,
+  tone: EmailTone = 'professional',
+  geminiApiKey?: string
+): Promise<{ subject: string; body: string }> {
+  const toneMap = {
+    professional: 'Formal and polished, like a senior professional.',
+    friendly: 'Warm and personable, like a colleague reaching out.',
+    casual: 'Relaxed and conversational, like a peer.',
+  };
+
+  const prompt = `Write a personalized cold email to this person:
+Name: ${prospect.firstName} ${prospect.lastName}
+Title: ${prospect.title || 'Recruiter'}
+Company: ${prospect.company}
+Location: ${prospect.location || 'Unknown'}
+Industry: ${prospect.industry || 'Unknown'}
+
+Context about the sender:
+${context}
+
+Tone: ${toneMap[tone]}
+
+Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
+
+  try {
+    const result = await generateText({
+      model: getGeminiModel(geminiApiKey),
+      system: SYSTEM_PROMPT,
+      prompt,
+      maxOutputTokens: 500,
+    });
+    return parseGeminiJSON(result.text);
+  } catch (err) {
+    console.error('[ReachOut] Gemini error:', err);
+    return fallbackEmail(prospect);
   }
 }
 
-/**
- * Batch generate emails for multiple prospects
- * Includes rate limiting to respect API quotas
- */
+// ─── From company domain ─────────────────────────────────────────────────────
+
+export async function generateEmailFromDomain(
+  prospect: ProspectForEmail,
+  companyDomain: string,
+  tone: EmailTone = 'professional',
+  geminiApiKey?: string
+): Promise<{ subject: string; body: string }> {
+  const prompt = `Write a personalized cold email from a job seeker to a recruiter at a company.
+
+Recipient: ${prospect.firstName} ${prospect.lastName} (${prospect.title || 'Recruiter'}) at ${prospect.company}
+Company domain: ${companyDomain}
+
+Research what ${prospect.company} (${companyDomain}) does and write a company-specific email that references something real about the company. Keep it under 120 words. Tone: ${tone}.
+
+Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
+
+  try {
+    const result = await generateText({
+      model: getGeminiModel(geminiApiKey),
+      system: SYSTEM_PROMPT,
+      prompt,
+      maxOutputTokens: 500,
+    });
+    return parseGeminiJSON(result.text);
+  } catch {
+    return generateEmail(prospect, `Interested in opportunities at ${prospect.company}`, tone, geminiApiKey);
+  }
+}
+
+// ─── From job description ────────────────────────────────────────────────────
+
+export async function generateEmailFromJobDescription(
+  prospect: ProspectForEmail,
+  jobDescription: string,
+  tone: EmailTone = 'professional',
+  geminiApiKey?: string
+): Promise<{ subject: string; body: string }> {
+  const prompt = `Write a personalized cold email from a job applicant to a recruiter based on this job description.
+
+Recipient: ${prospect.firstName} ${prospect.lastName} (${prospect.title || 'Recruiter'}) at ${prospect.company}
+
+Job Description:
+${jobDescription.slice(0, 2000)}
+
+Reference 1-2 specifics from the JD. Keep it under 120 words. Tone: ${tone}.
+
+Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
+
+  try {
+    const result = await generateText({
+      model: getGeminiModel(geminiApiKey),
+      system: SYSTEM_PROMPT,
+      prompt,
+      maxOutputTokens: 500,
+    });
+    return parseGeminiJSON(result.text);
+  } catch {
+    return generateEmail(prospect, `Applying for the role described`, tone, geminiApiKey);
+  }
+}
+
+// ─── Batch ───────────────────────────────────────────────────────────────────
+
 export async function generateEmailsBatch(
-  prospects: Prospect[],
+  prospects: ProspectForEmail[],
   context: string,
-  tone: 'professional' | 'friendly' | 'casual' = 'professional',
+  tone: EmailTone = 'professional',
   onProgress?: (current: number, total: number) => void,
-  aiProvider: 'openai' | 'google' = 'openai',
-  delayMs: number = 500
+  delayMs = 700,
+  geminiApiKey?: string
 ) {
   const emails = [];
 
   for (let i = 0; i < prospects.length; i++) {
     try {
-      const email = await generateEmail(
-        prospects[i],
-        context,
-        tone,
-        aiProvider
-      );
-
+      const email = await generateEmail(prospects[i], context, tone, geminiApiKey);
       emails.push({
         prospectId: prospects[i].id,
         prospectName: `${prospects[i].firstName} ${prospects[i].lastName}`,
-        prospectEmail: prospects[i].email,
+        prospectEmail: prospects[i].email || '',
         ...email,
         generatedAt: new Date(),
         status: 'draft' as const,
       });
-
-      onProgress?.(i + 1, prospects.length);
-
-      // Rate limiting delay
-      if (i < prospects.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    } catch (error) {
-      console.error(
-        `[v0] Failed to generate email for ${prospects[i].email}:`,
-        error
-      );
-      // Continue with next prospect
+    } catch (err) {
+      console.error(`[ReachOut] Failed for ${prospects[i].firstName}:`, err);
+    }
+    onProgress?.(i + 1, prospects.length);
+    if (i < prospects.length - 1) {
+      await new Promise(r => setTimeout(r, delayMs));
     }
   }
 
   return emails;
 }
 
-/**
- * Personalize email with variable substitution
- */
-export function personalizeEmail(
-  template: string,
-  variables: Record<string, string>
-): string {
-  let personalized = template;
+// ─── Template helpers ────────────────────────────────────────────────────────
 
-  Object.entries(variables).forEach(([key, value]) => {
-    const regex = new RegExp(`{{${key}}}`, 'gi');
-    personalized = personalized.replace(regex, value);
-  });
-
-  return personalized;
+export function personalizeEmail(template: string, variables: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/gi, (_, key) => variables[key] ?? `{{${key}}}`);
 }
 
-/**
- * Extract variables from template (e.g., {{firstName}}, {{company}})
- */
 export function extractTemplateVariables(template: string): string[] {
-  const regex = /{{(\w+)}}/g;
-  const matches = template.matchAll(regex);
-  return Array.from(matches).map(m => m[1]);
+  return [...new Set(Array.from(template.matchAll(/\{\{(\w+)\}\}/g)).map(m => m[1]))];
 }

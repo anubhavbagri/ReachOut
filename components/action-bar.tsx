@@ -20,7 +20,7 @@ export function ActionBar({ selectedCount }: ActionBarProps) {
       ...prospects.map(p => [
         p.firstName,
         p.lastName,
-        p.email,
+        p.email || '',
         p.company,
         p.title,
         p.location || '',

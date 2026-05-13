@@ -65,7 +65,7 @@ export function EmailPreview({ emails, onEdit }: EmailPreviewProps) {
       </div>
 
       {/* Email Preview Card */}
-      <Card className="p-8 space-y-6">
+      <Card className="p-4 md:p-8 space-y-6">
         {/* Prospect Info */}
         <div className="border-b border-border pb-4 space-y-2">
           <div className="flex items-center justify-between">
