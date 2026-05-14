@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { SentEmail } from '@/lib/types';
 import { Card } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { FOLLOWUP_TEMPLATES, applyTemplate } from '@/lib/email-templates';
+import { dbGetSentEmails, dbUpdateSentEmail } from '@/lib/supabase-db';
 
 const STATUS_CONFIG = {
   pending: {
@@ -65,10 +66,8 @@ function daysSince(date: Date | string) {
 }
 
 function SentEmailCard({ email }: { email: SentEmail }) {
-  const updateSentEmail = useStore(state => state.updateSentEmail);
-  const markFollowedUp = useStore(state => state.markFollowedUp);
-  const addToast = useStore(state => state.addToast);
-  const gmailAuth = useStore(state => state.gmailAuth);
+  const updateSentEmailCache = useStore(s => s.updateSentEmailCache);
+  const addToast = useStore(s => s.addToast);
 
   const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false);
   const [followUpNotes, setFollowUpNotes] = useState('');
@@ -81,18 +80,28 @@ function SentEmailCard({ email }: { email: SentEmail }) {
   );
   const needsFollowUp = email.followUpStatus === 'pending' && daysSinceSent >= 3;
 
+  const updateStatus = async (status: SentEmail['followUpStatus'], extra: Partial<SentEmail> = {}) => {
+    const updates = { followUpStatus: status, ...extra };
+    updateSentEmailCache(email.id, updates);
+    await dbUpdateSentEmail(email.id, updates);
+  };
+
   const handleMarkReplied = () => {
-    updateSentEmail(email.id, { followUpStatus: 'replied' });
+    updateStatus('replied');
     addToast('Marked as replied', 'success');
   };
 
   const handleMarkNotInterested = () => {
-    updateSentEmail(email.id, { followUpStatus: 'not_interested' });
+    updateStatus('not_interested');
     addToast('Marked as not interested', 'info');
   };
 
   const handleFollowUp = () => {
-    markFollowedUp(email.id, followUpNotes);
+    updateStatus('followed_up', {
+      followUpCount: email.followUpCount + 1,
+      lastFollowUpAt: new Date(),
+      notes: followUpNotes,
+    });
     setFollowUpDialogOpen(false);
     setFollowUpNotes('');
     addToast('Follow-up recorded', 'success');
@@ -300,14 +309,27 @@ function SentEmailCard({ email }: { email: SentEmail }) {
 }
 
 export default function FollowUpsPage() {
-  const sentEmails = useStore(state => state.sentEmails);
+  const sentEmailsCache = useStore(s => s.sentEmailsCache);
+  const setSentEmailsCache = useStore(s => s.setSentEmailsCache);
   const [filter, setFilter] = useState<'all' | 'pending' | 'followed_up' | 'replied' | 'not_interested'>('all');
+  const [loading, setLoading] = useState(true);
 
-  const filtered = sentEmails.filter(e =>
+  // Load from Supabase on mount (cross-device sync)
+  useEffect(() => {
+    setLoading(true);
+    dbGetSentEmails()
+      .then(emails => setSentEmailsCache(emails))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [setSentEmailsCache]);
+
+  const sentEmails = sentEmailsCache;
+
+  const filtered = sentEmails.filter((e: SentEmail) =>
     filter === 'all' ? true : e.followUpStatus === filter
   );
 
-  const needsFollowUp = sentEmails.filter(e => {
+  const needsFollowUp = sentEmails.filter((e: SentEmail) => {
     const days = Math.floor((Date.now() - new Date(e.sentAt).getTime()) / (1000 * 60 * 60 * 24));
     return e.followUpStatus === 'pending' && days >= 3;
   }).length;
@@ -343,17 +365,21 @@ export default function FollowUpsPage() {
               }`}
             >
               {f === 'all' ? `All (${sentEmails.length})` :
-               f === 'pending' ? `Needs Follow-up (${sentEmails.filter(e => e.followUpStatus === 'pending').length})` :
-               f === 'followed_up' ? `Followed Up (${sentEmails.filter(e => e.followUpStatus === 'followed_up').length})` :
-               f === 'replied' ? `Replied (${sentEmails.filter(e => e.followUpStatus === 'replied').length})` :
-               `Not Interested (${sentEmails.filter(e => e.followUpStatus === 'not_interested').length})`}
+               f === 'pending' ? `Needs Follow-up (${sentEmails.filter((e: SentEmail) => e.followUpStatus === 'pending').length})` :
+               f === 'followed_up' ? `Followed Up (${sentEmails.filter((e: SentEmail) => e.followUpStatus === 'followed_up').length})` :
+               f === 'replied' ? `Replied (${sentEmails.filter((e: SentEmail) => e.followUpStatus === 'replied').length})` :
+               `Not Interested (${sentEmails.filter((e: SentEmail) => e.followUpStatus === 'not_interested').length})`}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 md:p-6">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-40 text-muted-foreground gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading…
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
             <div className="text-6xl opacity-20">📬</div>
             <div>
@@ -377,7 +403,7 @@ export default function FollowUpsPage() {
           </div>
         ) : (
           <div className="space-y-4 max-w-3xl">
-            {filtered.map(email => (
+            {filtered.map((email: SentEmail) => (
               <SentEmailCard key={email.id} email={email} />
             ))}
           </div>
@@ -386,3 +412,5 @@ export default function FollowUpsPage() {
     </div>
   );
 }
+
+

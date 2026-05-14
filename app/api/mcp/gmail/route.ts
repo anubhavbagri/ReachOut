@@ -80,18 +80,34 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as {
-      refreshToken: string;
       to: string;
       subject: string;
       body: string;
       fromEmail?: string;
     };
 
-    const { refreshToken, to, subject, body: emailBody, fromEmail } = body;
+    const { to, subject, body: emailBody, fromEmail } = body;
 
-    if (!refreshToken || !to || !subject || !emailBody) {
+    if (!to || !subject || !emailBody) {
       return NextResponse.json(
-        { error: 'Missing required fields: refreshToken, to, subject, body' },
+        { error: 'Missing required fields: to, subject, body' },
+        { status: 400 }
+      );
+    }
+
+    // Load refresh token from Supabase app_config
+    const { createClient } = await import('@/utils/supabase/server');
+    const supabase = await createClient();
+    const { data: tokenRow } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', 'gmail_refresh_token')
+      .single();
+
+    const refreshToken = tokenRow?.value;
+    if (!refreshToken) {
+      return NextResponse.json(
+        { error: 'Gmail not connected. Go to Settings to connect your Gmail account.' },
         { status: 400 }
       );
     }

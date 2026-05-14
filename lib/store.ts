@@ -1,77 +1,78 @@
 /**
- * Zustand Global State Management
+ * Zustand — UI State Only
+ * API keys live in env vars. Persistent data lives in Supabase.
+ * Zustand is used for session-level UI state + persisted user preferences.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import {
-  SearchState,
-  Prospect,
-  ComposeState,
-  AppSettings,
-  ToastNotification,
-  GmailAuthState,
-  SentEmail,
-  EmailListEntry,
-} from './types';
+import { SearchState, Prospect, ComposeState, ToastNotification, EmailListEntry, SentEmail } from './types';
 import { DEFAULT_PERSON_TITLES } from './api-clients';
 
+export interface UIPreferences {
+  personTitles: string[];
+  emailDelayMs: number;
+  senderName: string;
+}
+
 interface ReachOutStore {
+  // Preferences (persisted in localStorage — safe, not secrets)
+  prefs: UIPreferences;
+  setPrefs: (p: Partial<UIPreferences>) => void;
+
+  // Gmail auth state — session cache only (source of truth: Supabase app_config)
+  gmailUserEmail: string;
+  gmailConnected: boolean;
+  setGmailState: (email: string, connected: boolean) => void;
+
   // Search
   search: SearchState;
-  setSearchQuery: (websiteUrl: string, personTitles?: string[]) => void;
   setSearchResults: (results: Prospect[]) => void;
   setSearchLoading: (loading: boolean) => void;
   setSearchError: (error?: string) => void;
   updateProspectEmail: (id: string, email: string) => void;
 
-  // Selection
-  selectedProspects: Set<string>;
-  toggleProspectSelection: (id: string) => void;
-  selectAllProspects: () => void;
-  clearSelection: () => void;
-  getSelectedProspectsData: () => Prospect[];
+  // Email list (transient — who to send to this session)
+  emailList: EmailListEntry[];
+  addToEmailList: (entry: EmailListEntry) => void;
+  removeFromEmailList: (id: string) => void;
+  clearEmailList: () => void;
+  isInEmailList: (id: string) => boolean;
 
   // Compose
   compose: ComposeState;
-  setComposeSubject: (subject: string) => void;
-  setComposeBody: (body: string) => void;
-  setComposeTone: (tone: 'professional' | 'friendly' | 'casual') => void;
-  setComposeLoading: (loading: boolean) => void;
-  setComposeError: (error?: string) => void;
-  setComposeProgress: (current: number, total: number) => void;
+  setComposeLoading: (v: boolean) => void;
+  setComposeProgress: (c: number, t: number) => void;
   resetCompose: () => void;
-
-  // Settings
-  settings: AppSettings;
-  setSettings: (settings: Partial<AppSettings>) => void;
-
-  // Gmail
-  gmailAuth: GmailAuthState;
-  setGmailAuth: (auth: Partial<GmailAuthState>) => void;
 
   // Toasts
   toasts: ToastNotification[];
-  addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
+  addToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
 
-  // Email list (prospects to send bulk emails to)
-  emailList: EmailListEntry[];
-  addToEmailList: (entry: EmailListEntry) => void;
-  removeFromEmailList: (prospectId: string) => void;
-  clearEmailList: () => void;
-  isInEmailList: (prospectId: string) => boolean;
-
-  // Follow-up tracking
-  sentEmails: SentEmail[];
-  addSentEmail: (email: SentEmail) => void;
-  updateSentEmail: (id: string, updates: Partial<SentEmail>) => void;
-  markFollowedUp: (id: string, notes?: string) => void;
+  // Sent emails cache (loaded from Supabase on follow-ups page)
+  sentEmailsCache: SentEmail[];
+  setSentEmailsCache: (emails: SentEmail[]) => void;
+  updateSentEmailCache: (id: string, updates: Partial<SentEmail>) => void;
+  addSentEmailToCache: (email: SentEmail) => void;
 }
 
 export const useStore = create<ReachOutStore>()(
   persist(
     (set, get) => ({
+      // ── Preferences ───────────────────────────────────────────────────────
+      prefs: {
+        personTitles: DEFAULT_PERSON_TITLES,
+        emailDelayMs: 1500,
+        senderName: '',
+      },
+      setPrefs: (p) => set(s => ({ prefs: { ...s.prefs, ...p } })),
+
+      // ── Gmail ─────────────────────────────────────────────────────────────
+      gmailUserEmail: '',
+      gmailConnected: false,
+      setGmailState: (email, connected) => set({ gmailUserEmail: email, gmailConnected: connected }),
+
       // ── Search ────────────────────────────────────────────────────────────
       search: {
         query: { websiteUrl: '', personTitles: DEFAULT_PERSON_TITLES },
@@ -80,194 +81,68 @@ export const useStore = create<ReachOutStore>()(
         totalCount: 0,
         hasMore: false,
       },
-
-      setSearchQuery: (websiteUrl, personTitles) =>
-        set(state => ({
-          search: {
-            ...state.search,
-            query: { websiteUrl, personTitles },
-          },
-        })),
-
       setSearchResults: (results) =>
-        set(state => ({
-          search: { ...state.search, results, totalCount: results.length },
-        })),
-
+        set(s => ({ search: { ...s.search, results, totalCount: results.length } })),
       setSearchLoading: (loading) =>
-        set(state => ({ search: { ...state.search, loading } })),
-
+        set(s => ({ search: { ...s.search, loading } })),
       setSearchError: (error) =>
-        set(state => ({ search: { ...state.search, error } })),
-
+        set(s => ({ search: { ...s.search, error } })),
       updateProspectEmail: (id, email) =>
-        set(state => ({
+        set(s => ({
           search: {
-            ...state.search,
-            results: state.search.results.map(p =>
-              p.id === id ? { ...p, email } : p
-            ),
+            ...s.search,
+            results: s.search.results.map(p => p.id === id ? { ...p, email } : p),
           },
         })),
-
-      // ── Selection ─────────────────────────────────────────────────────────
-      selectedProspects: new Set(),
-
-      toggleProspectSelection: (id) =>
-        set(state => {
-          const selected = new Set(state.selectedProspects);
-          selected.has(id) ? selected.delete(id) : selected.add(id);
-          return { selectedProspects: selected };
-        }),
-
-      selectAllProspects: () =>
-        set(state => ({
-          selectedProspects: new Set(state.search.results.map(p => p.id)),
-        })),
-
-      clearSelection: () => set({ selectedProspects: new Set() }),
-
-      getSelectedProspectsData: () => {
-        const state = get();
-        return state.search.results.filter(p => state.selectedProspects.has(p.id));
-      },
-
-      // ── Compose ───────────────────────────────────────────────────────────
-      compose: {
-        prospectIds: [],
-        subject: '',
-        body: '',
-        tone: 'professional',
-        loading: false,
-        progress: { current: 0, total: 0 },
-      },
-
-      setComposeSubject: (subject) =>
-        set(state => ({ compose: { ...state.compose, subject } })),
-
-      setComposeBody: (body) =>
-        set(state => ({ compose: { ...state.compose, body } })),
-
-      setComposeTone: (tone) =>
-        set(state => ({ compose: { ...state.compose, tone } })),
-
-      setComposeLoading: (loading) =>
-        set(state => ({ compose: { ...state.compose, loading } })),
-
-      setComposeError: (error) =>
-        set(state => ({ compose: { ...state.compose, error } })),
-
-      setComposeProgress: (current, total) =>
-        set(state => ({
-          compose: { ...state.compose, progress: { current, total } },
-        })),
-
-      resetCompose: () =>
-        set({
-          compose: {
-            prospectIds: [],
-            subject: '',
-            body: '',
-            tone: 'professional',
-            loading: false,
-            progress: { current: 0, total: 0 },
-          },
-        }),
-
-      // ── Settings ──────────────────────────────────────────────────────────
-      settings: {
-        apolloApiKey: '',
-        hunterApiKey: '',
-        contactOutApiKey: '',
-        openaiApiKey: '',
-        googleApiKey: '',
-        defaultAIProvider: 'openai',
-        emailDelayMs: 1500,
-        personTitles: DEFAULT_PERSON_TITLES,
-      },
-
-      setSettings: (newSettings) =>
-        set(state => ({
-          settings: { ...state.settings, ...newSettings },
-        })),
-
-      // ── Gmail ─────────────────────────────────────────────────────────────
-      gmailAuth: { isAuthenticated: false },
-
-      setGmailAuth: (auth) =>
-        set(state => ({ gmailAuth: { ...state.gmailAuth, ...auth } })),
-
-      // ── Toasts ────────────────────────────────────────────────────────────
-      toasts: [],
-
-      addToast: (message, type = 'info', duration = 3500) =>
-        set(state => {
-          const id = Math.random().toString(36).substr(2, 9);
-          if (duration) setTimeout(() => get().removeToast(id), duration);
-          return { toasts: [...state.toasts, { id, message, type }] };
-        }),
-
-      removeToast: (id) =>
-        set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
 
       // ── Email list ────────────────────────────────────────────────────────
       emailList: [],
-
       addToEmailList: (entry) =>
-        set(state => {
-          // Avoid duplicates
-          if (state.emailList.some(e => e.prospectId === entry.prospectId)) {
-            return {};
-          }
-          return { emailList: [...state.emailList, entry] };
-        }),
-
-      removeFromEmailList: (prospectId) =>
-        set(state => ({
-          emailList: state.emailList.filter(e => e.prospectId !== prospectId),
-        })),
-
+        set(s => s.emailList.some(e => e.prospectId === entry.prospectId)
+          ? {}
+          : { emailList: [...s.emailList, entry] }),
+      removeFromEmailList: (id) =>
+        set(s => ({ emailList: s.emailList.filter(e => e.prospectId !== id) })),
       clearEmailList: () => set({ emailList: [] }),
+      isInEmailList: (id) => get().emailList.some(e => e.prospectId === id),
 
-      isInEmailList: (prospectId) => {
-        return get().emailList.some(e => e.prospectId === prospectId);
+      // ── Compose ───────────────────────────────────────────────────────────
+      compose: {
+        prospectIds: [], subject: '', body: '', tone: 'professional',
+        loading: false, progress: { current: 0, total: 0 },
       },
+      setComposeLoading: (loading) =>
+        set(s => ({ compose: { ...s.compose, loading } })),
+      setComposeProgress: (current, total) =>
+        set(s => ({ compose: { ...s.compose, progress: { current, total } } })),
+      resetCompose: () =>
+        set({ compose: { prospectIds: [], subject: '', body: '', tone: 'professional', loading: false, progress: { current: 0, total: 0 } } }),
 
-      // ── Follow-ups ────────────────────────────────────────────────────────
-      sentEmails: [],
+      // ── Toasts ────────────────────────────────────────────────────────────
+      toasts: [],
+      addToast: (msg, type = 'info') => {
+        const id = Math.random().toString(36).slice(2);
+        set(s => ({ toasts: [...s.toasts, { id, message: msg, type }] }));
+        setTimeout(() => get().removeToast(id), 3500);
+      },
+      removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
-      addSentEmail: (email) =>
-        set(state => ({ sentEmails: [email, ...state.sentEmails] })),
-
-      updateSentEmail: (id, updates) =>
-        set(state => ({
-          sentEmails: state.sentEmails.map(e =>
-            e.id === id ? { ...e, ...updates } : e
-          ),
+      // ── Sent emails cache ─────────────────────────────────────────────────
+      sentEmailsCache: [],
+      setSentEmailsCache: (emails) => set({ sentEmailsCache: emails }),
+      updateSentEmailCache: (id, updates) =>
+        set(s => ({
+          sentEmailsCache: s.sentEmailsCache.map(e => e.id === id ? { ...e, ...updates } : e),
         })),
-
-      markFollowedUp: (id, notes) =>
-        set(state => ({
-          sentEmails: state.sentEmails.map(e =>
-            e.id === id
-              ? {
-                  ...e,
-                  followUpStatus: 'followed_up' as const,
-                  followUpCount: e.followUpCount + 1,
-                  lastFollowUpAt: new Date(),
-                  notes: notes || e.notes,
-                }
-              : e
-          ),
-        })),
+      addSentEmailToCache: (email) =>
+        set(s => ({ sentEmailsCache: [email, ...s.sentEmailsCache] })),
     }),
     {
-      name: 'reachout-v2',
-      partialize: (state) => ({
-        settings: state.settings,
-        gmailAuth: state.gmailAuth,
-        sentEmails: state.sentEmails,
-        emailList: state.emailList,
+      name: 'reachout-v3',
+      partialize: (s) => ({
+        prefs: s.prefs,
+        gmailUserEmail: s.gmailUserEmail,
+        gmailConnected: s.gmailConnected,
       }),
     }
   )

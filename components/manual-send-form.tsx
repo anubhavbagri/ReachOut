@@ -135,8 +135,7 @@ function parseContacts(raw: string): ManualContact[] {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function ManualSendForm({ onEmailsReady }: ManualSendFormProps) {
-  const settings = useStore(state => state.settings);
-  const addToast = useStore(state => state.addToast);
+  const addToast = useStore(s => s.addToast);
 
   // Contacts
   const [contacts, setContacts] = useState<ManualContact[]>([]);
@@ -255,14 +254,14 @@ export function ManualSendForm({ onEmailsReady }: ManualSendFormProps) {
         } else if (mode === 'domain') {
           const domain = (c.website || c.company)
             .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-          generated = await generateEmailFromDomain(prospect, domain, tone, settings.googleApiKey);
+          generated = await generateEmailFromDomain(prospect, domain, tone);
           // Inject sender name
           if (senderName) {
             generated.body = generated.body.replace(/\[your name\]/i, senderName);
           }
         } else {
           // JD mode
-          generated = await generateEmailFromJobDescription(prospect, jobDescription, tone, settings.googleApiKey);
+          generated = await generateEmailFromJobDescription(prospect, jobDescription, tone);
           if (senderName) {
             generated.body = generated.body.replace(/\[your name\]/i, senderName);
           }
@@ -303,7 +302,6 @@ export function ManualSendForm({ onEmailsReady }: ManualSendFormProps) {
   };
 
   const needsGemini = mode === 'domain' || mode === 'jd';
-  const hasGeminiKey = !!settings.googleApiKey || !!process.env.GOOGLE_API_KEY;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -490,14 +488,7 @@ export function ManualSendForm({ onEmailsReady }: ManualSendFormProps) {
                 ))}
               </div>
             </div>
-            {needsGemini && !settings.googleApiKey && (
-              <div className="flex items-start gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
-                <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                  Add your <strong>Google (Gemini) API key</strong> in Settings to use AI generation.
-                </p>
-              </div>
-            )}
+
           </div>
         )}
 
@@ -530,14 +521,7 @@ export function ManualSendForm({ onEmailsReady }: ManualSendFormProps) {
                 ))}
               </div>
             </div>
-            {!settings.googleApiKey && (
-              <div className="flex items-start gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
-                <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                  Add your <strong>Google (Gemini) API key</strong> in Settings to use AI generation.
-                </p>
-              </div>
-            )}
+
           </div>
         )}
       </Card>

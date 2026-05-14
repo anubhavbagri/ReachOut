@@ -29,11 +29,13 @@ export function isValidDomain(input: string): boolean {
 export interface ApolloPersonRaw {
   id: string;
   first_name: string;
-  last_name: string;
-  name: string;
+  last_name?: string;              // full last name (old endpoint)
+  last_name_obfuscated?: string;   // truncated e.g. "B..." (new endpoint)
+  name?: string;
   title?: string;
   email?: string;
-  linkedin_url?: string;
+  linkedin_url?: string;           // not returned by mixed_people/api_search
+  has_email?: boolean;
   city?: string;
   state?: string;
   country?: string;
@@ -68,11 +70,11 @@ export const DEFAULT_PERSON_TITLES = [
   'talent acquisition',
 ];
 
-// contact_email_status values — hardcoded, not shown in UI
-const CONTACT_EMAIL_STATUSES = ['verified', 'unverified', 'user managed', 'update required'];
+// removed contact_email_status to fetch all results
 
 /**
- * POST /v1/people/search — search by company domain
+ * POST /api/v1/mixed_people/api_search — search by company domain
+ * (Replaces deprecated /v1/people/search)
  * API key goes in the header as X-Api-Key
  */
 export async function apolloSearchByDomain(
@@ -82,11 +84,10 @@ export async function apolloSearchByDomain(
   perPage = 25
 ): Promise<Prospect[]> {
   const response = await axios.post<ApolloSearchResponse>(
-    'https://api.apollo.io/v1/people/search',
+    'https://api.apollo.io/api/v1/mixed_people/api_search',
     {
       q_organization_domains_list: [domain],
       person_titles: personTitles,
-      contact_email_status: CONTACT_EMAIL_STATUSES,
       per_page: perPage,
       page: 1,
     },
@@ -101,21 +102,28 @@ export async function apolloSearchByDomain(
 
   const people = response.data.people || response.data.contacts || [];
 
-  return people.map((p): Prospect => ({
-    id: p.id,
-    firstName: p.first_name,
-    lastName: p.last_name,
-    email: undefined, // revealed separately
-    company: p.organization?.name || domain,
-    title: p.title || '',
-    linkedin: p.linkedin_url,
-    website: p.organization?.website_url || `https://${domain}`,
-    location: [p.city, p.state, p.country].filter(Boolean).join(', ') || undefined,
-    industry: p.organization?.industry,
-    score: 85,
-    source: 'apollo',
-    createdAt: new Date(),
-  }));
+  return people.map((p): Prospect => {
+    const firstName = p.first_name || '';
+    const lastName = p.last_name || p.last_name_obfuscated || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const company = p.organization?.name || domain;
+
+    return {
+      id: p.id,
+      firstName,
+      lastName,
+      email: undefined, // revealed separately
+      company,
+      title: p.title || '',
+      linkedin: undefined, // removed fake linkedin URL as requested
+      website: p.organization?.website_url || `https://${domain}`,
+      location: [p.city, p.state, p.country].filter(Boolean).join(', ') || undefined,
+      industry: p.organization?.industry,
+      score: 85,
+      source: 'apollo',
+      createdAt: new Date(),
+    };
+  });
 }
 
 // ─── Apollo People Enrichment (reveal email) ─────────────────────────────────
@@ -125,6 +133,7 @@ export interface ApolloEnrichResponse {
     id: string;
     email?: string;
     email_status?: string;
+    [key: string]: unknown; // Allow any other fields to be returned in details
   };
 }
 
@@ -135,7 +144,7 @@ export interface ApolloEnrichResponse {
 export async function apolloRevealEmail(
   prospectId: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<{ email: string | null; details: Record<string, unknown> | null }> {
   const response = await axios.post<ApolloEnrichResponse>(
     'https://api.apollo.io/v1/people/match',
     {
@@ -149,7 +158,11 @@ export async function apolloRevealEmail(
       },
     }
   );
-  return response.data?.person?.email || null;
+
+  return {
+    email: response.data.person?.email || null,
+    details: response.data.person || null
+  };
 }
 
 // ─── Hunter Email Finder ─────────────────────────────────────────────────────
@@ -190,9 +203,14 @@ export async function hunterFindEmail(
 
 export interface ContactOutResponse {
   profile?: {
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    company?: string;
     emails?: Array<{ email: string; type?: string }> | string[];
     work_email?: string;
     personal_email?: string;
+    [key: string]: unknown;
   };
 }
 
@@ -203,7 +221,7 @@ export interface ContactOutResponse {
 export async function contactOutFindEmail(
   linkedinUrl: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<{ email: string | null; profile: Record<string, unknown> | null }> {
   // Normalize LinkedIn URL
   const url = linkedinUrl.startsWith('http') ? linkedinUrl : `https://${linkedinUrl}`;
 
@@ -219,18 +237,15 @@ export async function contactOutFindEmail(
   );
 
   const profile = response.data?.profile;
-  if (!profile) return null;
+  if (!profile) return { email: null, profile: null };
 
-  // Prefer work email, then first email in array
-  if (profile.work_email) return profile.work_email;
-  if (profile.personal_email) return profile.personal_email;
+  let email = profile.work_email || profile.personal_email;
+  if (!email && profile.emails && profile.emails.length > 0) {
+    const first = profile.emails[0];
+    email = typeof first === 'string' ? first : (first as { email: string }).email;
+  }
 
-  const emails = profile.emails;
-  if (!emails || emails.length === 0) return null;
-
-  const first = emails[0];
-  if (typeof first === 'string') return first;
-  return (first as { email: string }).email || null;
+  return { email: email || null, profile };
 }
 
 // ─── Sanitize ────────────────────────────────────────────────────────────────

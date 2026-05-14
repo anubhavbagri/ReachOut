@@ -25,7 +25,6 @@ export default function ComposePage() {
   const setComposeLoading = useStore(state => state.setComposeLoading);
   const setComposeProgress = useStore(state => state.setComposeProgress);
   const addToast = useStore(state => state.addToast);
-  const settings = useStore(state => state.settings);
 
   // Convert email list entries to Prospect-shaped objects for generation
   const prospectsForGeneration = emailList.map(e => ({
@@ -70,15 +69,15 @@ export default function ComposePage() {
         context,
         tone,
         (current, total) => setComposeProgress(current, total),
-        700,
-        settings.googleApiKey // pass key from Settings UI
+        700
+        // Gemini API key read from GOOGLE_GENERATIVE_AI_API_KEY env var server-side
       );
 
       setEmails(generatedEmails);
       addToast(`Generated ${generatedEmails.length} emails`, 'success');
     } catch (error) {
       console.error('[ReachOut] Email generation error:', error);
-      addToast('Failed to generate emails — check your OpenAI API key in Settings', 'error');
+      addToast('Failed to generate emails — check GOOGLE_GENERATIVE_AI_API_KEY in Vercel env vars', 'error');
       setActiveTab('compose');
     } finally {
       setComposeLoading(false);
@@ -127,16 +126,6 @@ export default function ComposePage() {
         </div>
       </div>
 
-      {/* No OpenAI key warning */}
-      {!settings.openaiApiKey && (
-        <div className="shrink-0 mx-4 md:mx-6 mt-4 flex items-start gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg px-3 py-2.5">
-          <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-yellow-800 dark:text-yellow-300">
-            <span className="font-medium">OpenAI API key not set.</span>{' '}
-            <Link href="/app/settings" className="underline">Add it in Settings</Link> to generate AI emails.
-          </p>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
