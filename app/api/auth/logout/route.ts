@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE } from '@/middleware';
+import { SESSION_COOKIE } from '@/proxy';
 
 export async function POST() {
   const response = NextResponse.json({ success: true });
