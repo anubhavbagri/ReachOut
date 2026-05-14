@@ -58,6 +58,7 @@ create table if not exists public.revealed_prospects (
   linkedin_url      text,
   title             text,
   organization_id   text,
+  company           text,
   email             text        not null,
   source            text        not null default 'apollo',
   revealed_at       timestamptz not null default now()

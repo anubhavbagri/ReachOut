@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     
     if (result.email && result.details) {
       const d = result.details;
+      const companyName = (d.employment_history as any[])?.[0]?.organization_name || undefined;
       await dbInsertRevealedProspect({
         apollo_id: d.id as string | undefined,
         first_name: d.first_name as string | undefined,
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
         linkedin_url: d.linkedin_url as string | undefined,
         title: d.title as string | undefined,
         organization_id: d.organization_id as string | undefined,
+        company: companyName as string | undefined,
         email: result.email,
         source: 'apollo'
       });

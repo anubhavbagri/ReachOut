@@ -16,6 +16,7 @@ export interface RevealedProspect {
   linkedin_url?: string;
   title?: string;
   organization_id?: string;
+  company?: string;
   email: string;
   source: string;
   revealed_at?: Date;
@@ -67,6 +68,7 @@ export async function dbInsertRevealedProspect(p: RevealedProspect): Promise<voi
     linkedin_url: p.linkedin_url,
     title: p.title,
     organization_id: p.organization_id,
+    company: p.company,
     email: p.email,
     source: p.source,
   };
@@ -91,6 +93,7 @@ export async function dbGetRevealedProspects(): Promise<RevealedProspect[]> {
     linkedin_url: row.linkedin_url,
     title: row.title,
     organization_id: row.organization_id,
+    company: row.company,
     email: row.email,
     source: row.source,
     revealed_at: new Date(row.revealed_at),

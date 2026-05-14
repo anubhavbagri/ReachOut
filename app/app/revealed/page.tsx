@@ -76,6 +76,7 @@ export default function RevealedPage() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase">
                   <tr>
+                    <th className="px-4 py-3 font-medium">Company</th>
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium">Title</th>
                     <th className="px-4 py-3 font-medium">Email</th>
@@ -87,6 +88,9 @@ export default function RevealedPage() {
                 <tbody className="divide-y divide-border">
                   {prospects.map((p) => (
                     <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium text-primary">
+                        {p.company || 'Unknown Company'}
+                      </td>
                       <td className="px-4 py-3 font-medium">
                         {p.linkedin_url ? (
                           <a href={p.linkedin_url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
@@ -128,7 +132,7 @@ export default function RevealedPage() {
                                     prospectId: id,
                                     prospectName: p.name || p.first_name || 'Unknown',
                                     prospectEmail: p.email,
-                                    prospectCompany: p.organization_id || 'Unknown Company',
+                                    prospectCompany: p.company || p.organization_id || 'Unknown Company',
                                     prospectTitle: p.title || '',
                                     addedAt: new Date(),
                                   });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE } from '@/middleware';
+import { SESSION_COOKIE } from '@/proxy';
 
 export const runtime = 'nodejs';
 

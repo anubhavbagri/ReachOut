@@ -19,7 +19,7 @@ function expectedToken(): string {
 const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout'];
 const STATIC = ['/_next', '/favicon.ico'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (STATIC.some(s => pathname.startsWith(s))) return NextResponse.next();
