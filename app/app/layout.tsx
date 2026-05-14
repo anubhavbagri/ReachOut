@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Settings, Search, Mail, RotateCcw, Send } from 'lucide-react';
+import { Settings, Search, Mail, RotateCcw, Send, History } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 const NAV_LINKS = [
@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: '/app/manual-send', label: 'Manual Send', icon: Send    },
   { href: '/app/compose',     label: 'Compose',     icon: Mail    },
   { href: '/app/follow-ups',  label: 'Follow-ups',  icon: RotateCcw },
+  { href: '/app/revealed',    label: 'Revealed',    icon: History },
   { href: '/app/settings',    label: 'Settings',    icon: Settings },
 ];
 

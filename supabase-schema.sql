@@ -47,3 +47,29 @@ create index if not exists sent_emails_sent_at_idx
 
 create index if not exists sent_emails_status_idx
   on public.sent_emails (follow_up_status);
+
+-- ── revealed_prospects ───────────────────────────────
+create table if not exists public.revealed_prospects (
+  id                uuid        primary key default gen_random_uuid(),
+  apollo_id         text,
+  first_name        text,
+  last_name         text,
+  name              text,
+  linkedin_url      text,
+  title             text,
+  organization_id   text,
+  email             text        not null,
+  source            text        not null default 'apollo',
+  revealed_at       timestamptz not null default now()
+);
+
+alter table public.revealed_prospects enable row level security;
+
+create policy "allow_all_revealed_prospects"
+  on public.revealed_prospects for all to anon using (true) with check (true);
+
+create index if not exists revealed_prospects_email_idx
+  on public.revealed_prospects (email);
+
+create index if not exists revealed_prospects_revealed_at_idx
+  on public.revealed_prospects (revealed_at desc);

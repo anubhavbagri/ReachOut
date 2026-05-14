@@ -7,6 +7,20 @@
 import { createClient } from '@/utils/supabase/client';
 import { SentEmail } from '@/lib/types';
 
+export interface RevealedProspect {
+  id?: string;
+  apollo_id?: string;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  linkedin_url?: string;
+  title?: string;
+  organization_id?: string;
+  email: string;
+  source: string;
+  revealed_at?: Date;
+}
+
 // ─── Sent Emails ─────────────────────────────────────────────────────────────
 
 export async function dbGetSentEmails(): Promise<SentEmail[]> {
@@ -39,6 +53,48 @@ export async function dbUpdateSentEmail(
 
   const { error } = await supabase.from('sent_emails').update(row).eq('id', id);
   if (error) console.error('[DB] updateSentEmail:', error);
+}
+
+// ─── Revealed Prospects ──────────────────────────────────────────────────────
+
+export async function dbInsertRevealedProspect(p: RevealedProspect): Promise<void> {
+  const supabase = createClient();
+  const row = {
+    apollo_id: p.apollo_id,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    name: p.name,
+    linkedin_url: p.linkedin_url,
+    title: p.title,
+    organization_id: p.organization_id,
+    email: p.email,
+    source: p.source,
+  };
+  const { error } = await supabase.from('revealed_prospects').insert(row);
+  if (error) console.error('[DB] insertRevealedProspect:', error);
+}
+
+export async function dbGetRevealedProspects(): Promise<RevealedProspect[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('revealed_prospects')
+    .select('*')
+    .order('revealed_at', { ascending: false });
+
+  if (error) { console.error('[DB] getRevealedProspects:', error); return []; }
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    apollo_id: row.apollo_id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    name: row.name,
+    linkedin_url: row.linkedin_url,
+    title: row.title,
+    organization_id: row.organization_id,
+    email: row.email,
+    source: row.source,
+    revealed_at: new Date(row.revealed_at),
+  }));
 }
 
 // ─── App Config (Gmail refresh token, etc.) ───────────────────────────────────
