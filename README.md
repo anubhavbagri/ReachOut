@@ -2,20 +2,20 @@
 
 A private, personal cold outreach platform. Find hiring managers & recruiters at any company, reveal their emails via Apollo/Hunter/ContactOut, write AI-personalized emails with Gemini, send from your personal Gmail, and track all follow-ups in Supabase.
 
-> **Private by design** — protected by a login gate. No external SaaS. All data in your own Supabase project.
+> **Private by design** - protected by a login gate. No external SaaS. All data in your own Supabase project.
 >
 > 📬 **Gmail setup?** See [GMAIL_SETUP.md](./GMAIL_SETUP.md) for the complete step-by-step guide.
-
----
 
 ## Features
 
 ### 🔍 Prospect Search (Apollo)
+
 - Enter any company domain (e.g. `stripe.com`)
 - Apollo People API returns recruiters, TA specialists, and hiring managers
 - Customizable job title filters shown in the UI (add/remove from search page)
 
 ### 📧 Triple Email Reveal
+
 | Source | Trigger | Notes |
 |---|---|---|
 | **Apollo** | `Apollo` button | Primary — uses person ID from search |
@@ -25,7 +25,9 @@ A private, personal cold outreach platform. Find hiring managers & recruiters at
 All reveal calls go through server-side Next.js API routes — API keys never touch the client.
 
 ### 🤖 Gemini AI Email Writing
+
 Three generation modes:
+
 - **Template** — fast variable substitution (`{{firstName}}`, `{{company}}`, etc.)
 - **AI by Domain** — Gemini researches the company and writes a tailored email
 - **AI by Job Description** — paste a JD and Gemini writes around specific role details
@@ -33,19 +35,23 @@ Three generation modes:
 Three tones: Professional / Friendly / Casual
 
 ### 📋 Manual CSV Import (`/app/manual-send`)
+
 Bring your own contact list:
+
 - Paste CSV, upload `.csv` file, or add manually row by row
 - Supported columns: `firstName, lastName, email, company, title, website`
 - Also supports: `Full Name, email, company, title`
 - Same AI generation modes as Apollo flow
 
 ### ✉️ Gmail Bulk Send
+
 - OAuth 2.0 — connects to your personal Gmail account once
 - Refresh token stored in Supabase `app_config` — works across all devices
 - Configurable delay between emails (default 1500ms)
 - All sends tracked in Supabase for follow-up
 
 ### 📊 Follow-up Tracking (Supabase-backed)
+
 - Every sent email persisted in `sent_emails` table
 - Status: `pending` → `followed_up` → `replied` / `not_interested`
 - Pre-built follow-up templates (3 variants) with editable content
@@ -53,11 +59,10 @@ Bring your own contact list:
 - Loads from Supabase on every visit — cross-device sync
 
 ### 🔒 Private Login
+
 - Username/password login gate (credentials stored in Vercel env vars)
 - 90-day session cookie — stay logged in across devices
 - All `/app` and `/api` routes are protected by Next.js middleware
-
----
 
 ## Tech Stack
 
@@ -73,8 +78,6 @@ Bring your own contact list:
 | Email Reveal | Apollo / Hunter.io / ContactOut |
 | State | Zustand (session UI cache only) |
 | Deployment | Vercel |
-
----
 
 ## Setup
 
@@ -139,8 +142,6 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
----
-
 ## Project Structure
 
 ```
@@ -186,8 +187,6 @@ middleware.ts                # Auth gate — protects /app and /api/*
 supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 ```
 
----
-
 ## Deploying to Vercel
 
 1. Push to GitHub
@@ -196,11 +195,10 @@ supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 4. Deploy
 5. Connect Gmail in Settings → done
 
----
-
 ## Supabase Tables
 
 ### `sent_emails`
+
 | Column | Type | Notes |
 |---|---|---|
 | `id` | text PK | Generated on send |
@@ -213,6 +211,7 @@ supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 | `gmail_thread_id` | text | For direct Gmail link |
 
 ### `app_config`
+
 | Column | Type | Notes |
 |---|---|---|
 | `key` | text PK | e.g. `gmail_refresh_token`, `gmail_user_email` |
