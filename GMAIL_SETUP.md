@@ -1,8 +1,6 @@
-# Gmail Setup Guide — ReachOut
+# Gmail Setup Guide - ReachOut
 
 > **One-time setup.** Once connected, your Gmail refresh token is stored in Supabase and works across all your devices — no re-auth needed.
-
----
 
 ## Overview
 
@@ -59,8 +57,6 @@ sequenceDiagram
     end
 ```
 
----
-
 ## Step 1 — Create a Google Cloud Project
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com/)
@@ -68,14 +64,10 @@ sequenceDiagram
 3. Name it (e.g. `ReachOut`) → **Create**
 4. Select the project from the dropdown
 
----
-
 ## Step 2 — Enable the Gmail API
 
 1. In the sidebar → **APIs & Services → Library**
 2. Search for **"Gmail API"** → click it → **Enable**
-
----
 
 ## Step 3 — Configure the OAuth Consent Screen
 
@@ -99,8 +91,6 @@ sequenceDiagram
 > [!NOTE]
 > Since this is a personal tool, you don't need to go through Google's app verification. Staying in "Testing" mode is fine — you (as a test user) can use it indefinitely.
 
----
-
 ## Step 4 — Create OAuth 2.0 Credentials
 
 1. **APIs & Services → Credentials**
@@ -118,8 +108,6 @@ sequenceDiagram
 
 6. Click **Create**
 7. Copy the **Client ID** and **Client Secret** shown in the popup
-
----
 
 ## Step 5 — Add Environment Variables
 
@@ -142,8 +130,6 @@ GOOGLE_CLIENT_SECRET=your_client_secret
 > [!IMPORTANT]
 > `NEXT_PUBLIC_BASE_URL` must exactly match the domain you added as an Authorized Redirect URI in Step 4. If they don't match, Google will reject the OAuth callback with a `redirect_uri_mismatch` error.
 
----
-
 ## Step 6 — Connect Gmail in the App
 
 1. Open the app → **Settings** (bottom nav or sidebar)
@@ -152,8 +138,6 @@ GOOGLE_CLIENT_SECRET=your_client_secret
 4. Click **Allow** on the permissions screen
 5. You'll be redirected back to Settings — you'll see "Connected" with your Gmail address
 6. ✅ Done — the refresh token is now stored in your Supabase `app_config` table
-
----
 
 ## Step 7 — Verify Supabase Storage
 
@@ -167,8 +151,6 @@ After connecting, confirm the token was saved:
 
 This means any device you log into will automatically have Gmail connected — no re-auth needed.
 
----
-
 ## Troubleshooting
 
 | Problem | Fix |
@@ -180,8 +162,6 @@ This means any device you log into will automatically have Gmail connected — n
 | `GOOGLE_CLIENT_ID not configured` | The env var is missing — check Vercel → Settings → Environment Variables |
 | Consent screen shows "This app isn't verified" | Click **Advanced → Go to ReachOut (unsafe)** — this is expected for personal/testing apps |
 
----
-
 ## OAuth Scopes Used
 
 | Scope | Why |
@@ -190,16 +170,12 @@ This means any device you log into will automatically have Gmail connected — n
 | `gmail.readonly` | Needed to fetch thread IDs for Gmail links in follow-ups |
 | `userinfo.email` | Get your Gmail address to display in Settings and email headers |
 
----
-
 ## Security Notes
 
 - The refresh token is stored in **your own Supabase database** — not in any third-party system
 - The token is only used server-side inside `/api/mcp/gmail` — it never reaches the browser
 - All `/api` routes are protected by the login middleware — only you can trigger Gmail sends
 - Google refresh tokens for Gmail don't expire unless you revoke them or change your Google password
-
----
 
 ## Revoking Access
 
