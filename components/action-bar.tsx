@@ -67,10 +67,10 @@ export function ActionBar({ selectedCount }: ActionBarProps) {
           Export CSV
         </Button>
 
-        <Link href="/app/compose">
+        <Link href="/app/send">
           <Button size="sm" className="gap-2">
             <Mail className="w-4 h-4" />
-            Compose Emails
+            Send Emails
           </Button>
         </Link>
       </div>

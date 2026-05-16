@@ -43,11 +43,12 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<SendResult[]>([]);
-  const [delayMs, setDelayMs] = useState(1500);
+  const [delayMs, setDelayMs] = useState(500);
 
   const addToast = useStore(s => s.addToast);
   const gmailConnected = useStore(s => s.gmailConnected);
   const gmailUserEmail = useStore(s => s.gmailUserEmail);
+  const gmailSenderName = useStore(s => s.gmailUserEmail); // used as display name fallback
   const addSentEmailToCache = useStore(s => s.addSentEmailToCache);
 
   const isGmailConnected = gmailConnected;
@@ -76,6 +77,7 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
             subject: email.subject,
             body: email.body,
             fromEmail: gmailUserEmail || undefined,
+            fromName: 'Anubhav Bagri',
           }),
         });
 
@@ -140,6 +142,11 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
         : `${sent} emails sent successfully!`,
       failed > 0 ? 'warning' : 'success'
     );
+    // Clear build/review state so the form resets for next batch
+    try {
+      sessionStorage.removeItem('reachout_manual_form_state');
+      sessionStorage.removeItem('reachout_manual_page_state');
+    } catch { /* ignore */ }
     onComplete?.();
   };
 
@@ -197,8 +204,8 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
                 min={500}
                 max={30000}
                 step={500}
-                value={delayMs}
-                onChange={e => setDelayMs(parseInt(e.target.value))}
+                value={delayMs || ''}
+                onChange={e => setDelayMs(parseInt(e.target.value) || 500)}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {emails.length} emails ≈ {Math.ceil((delayMs * (emails.length - 1)) / 1000)}s total. Minimum 500ms recommended.

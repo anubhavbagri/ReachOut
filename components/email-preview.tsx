@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
-import { ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react';
 
 interface Email {
   prospectId: string;
@@ -18,47 +17,56 @@ interface Email {
 
 interface EmailPreviewProps {
   emails: Email[];
-  onEdit: (index: number, updated: Email) => void;
+  onEmailsChange: (emails: Email[]) => void;
 }
 
-export function EmailPreview({ emails, onEdit }: EmailPreviewProps) {
+export function EmailPreview({ emails, onEmailsChange }: EmailPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [editMode, setEditMode] = useState(false);
-  const [editedEmail, setEditedEmail] = useState(emails[currentIndex]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editSubject, setEditSubject] = useState('');
+  const [editBody, setEditBody] = useState('');
 
-  const email = editedEmail;
+  const email = emails[currentIndex];
 
   const handleNext = () => {
-    if (editMode) {
-      onEdit(currentIndex, editedEmail);
-    }
     if (currentIndex < emails.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setEditedEmail(emails[currentIndex + 1]);
-      setEditMode(false);
+      setIsEditing(false);
     }
   };
 
   const handlePrevious = () => {
-    if (editMode) {
-      onEdit(currentIndex, editedEmail);
-    }
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
-      setEditedEmail(emails[currentIndex - 1]);
-      setEditMode(false);
+      setIsEditing(false);
     }
   };
 
-  const handleSaveEdit = () => {
-    onEdit(currentIndex, editedEmail);
-    setEditMode(false);
+  const startEditing = () => {
+    setEditSubject(email.subject);
+    setEditBody(email.body);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  const saveEditing = () => {
+    const updated = [...emails];
+    updated[currentIndex] = {
+      ...updated[currentIndex],
+      subject: editSubject,
+      body: editBody,
+    };
+    onEmailsChange(updated);
+    setIsEditing(false);
   };
 
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Review & Edit Emails</h2>
+        <h2 className="text-2xl font-bold">Review Emails</h2>
         <div className="text-sm text-muted-foreground">
           {currentIndex + 1} of {emails.length}
         </div>
@@ -66,83 +74,63 @@ export function EmailPreview({ emails, onEdit }: EmailPreviewProps) {
 
       {/* Email Preview Card */}
       <Card className="p-4 md:p-8 space-y-6">
-        {/* Prospect Info */}
-        <div className="border-b border-border pb-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-lg">{email.prospectName}</h3>
-              <p className="text-sm text-muted-foreground">{email.prospectEmail}</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditMode(!editMode)}
-              className="gap-2"
-            >
-              {editMode ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Done
-                </>
-              ) : (
-                <>
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </>
-              )}
-            </Button>
+        {/* Prospect Info and Edit Toggle */}
+        <div className="border-b border-border pb-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-lg">{email.prospectName}</h3>
+            <p className="text-sm text-muted-foreground">{email.prospectEmail}</p>
           </div>
+          {isEditing ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={cancelEditing} className="gap-1">
+                <X className="w-3.5 h-3.5" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={saveEditing} className="gap-1">
+                <Save className="w-3.5 h-3.5" />
+                Save
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={startEditing} className="gap-1">
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit
+            </Button>
+          )}
         </div>
 
-        {/* Email Content */}
-        {editMode ? (
-          <FieldGroup>
-            <Field>
-              <FieldLabel>Subject</FieldLabel>
-              <Input
-                value={editedEmail.subject}
-                onChange={e =>
-                  setEditedEmail({ ...editedEmail, subject: e.target.value })
-                }
+        {/* Email content */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground tracking-wide">SUBJECT</label>
+            {isEditing ? (
+              <Input 
+                value={editSubject} 
+                onChange={e => setEditSubject(e.target.value)}
+                className="font-semibold text-base"
               />
-            </Field>
-
-            <Field>
-              <FieldLabel>Body</FieldLabel>
-              <Textarea
-                value={editedEmail.body}
-                onChange={e =>
-                  setEditedEmail({ ...editedEmail, body: e.target.value })
-                }
-                rows={8}
-                className="resize-none"
-              />
-            </Field>
-
-            <Button
-              onClick={handleSaveEdit}
-              className="w-full"
-            >
-              Save Changes
-            </Button>
-          </FieldGroup>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground">SUBJECT</label>
-              <div className="text-lg font-semibold p-3 bg-muted rounded-lg">
+            ) : (
+              <div className="text-base font-semibold p-3 bg-muted rounded-lg">
                 {email.subject}
               </div>
-            </div>
+            )}
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground">BODY</label>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground tracking-wide">BODY</label>
+            {isEditing ? (
+              <Textarea 
+                value={editBody} 
+                onChange={e => setEditBody(e.target.value)}
+                className="min-h-[300px] text-sm leading-relaxed"
+              />
+            ) : (
               <div className="text-sm whitespace-pre-wrap p-4 bg-muted rounded-lg text-foreground leading-relaxed">
                 {email.body}
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </Card>
 
       {/* Navigation */}
@@ -164,15 +152,11 @@ export function EmailPreview({ emails, onEdit }: EmailPreviewProps) {
               className={`h-2 rounded-full transition-all ${
                 idx === currentIndex
                   ? 'w-8 bg-primary'
-                  : 'w-2 bg-muted hover:bg-muted-foreground'
+                  : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground'
               } cursor-pointer`}
               onClick={() => {
-                if (editMode) {
-                  onEdit(currentIndex, editedEmail);
-                }
                 setCurrentIndex(idx);
-                setEditedEmail(emails[idx]);
-                setEditMode(false);
+                setIsEditing(false);
               }}
             />
           ))}

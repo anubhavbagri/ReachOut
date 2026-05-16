@@ -225,8 +225,8 @@ export function ProspectsGrid({ prospects }: { prospects: Prospect[] }) {
           <span className="font-medium">
             <span className="text-primary font-bold">{emailList.length}</span> in send list
           </span>
-          <a href="/app/compose" className="text-primary hover:underline text-xs font-medium flex items-center gap-1">
-            Compose emails <ExternalLink className="w-3 h-3" />
+          <a href="/app/send" className="text-primary hover:underline text-xs font-medium flex items-center gap-1">
+            Send emails <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       )}

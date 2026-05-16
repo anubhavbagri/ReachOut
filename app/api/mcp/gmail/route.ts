@@ -41,17 +41,64 @@ async function getAccessToken(refreshToken: string): Promise<string> {
 }
 
 /**
+ * Encode a header value using RFC 2047 if it contains non-ASCII characters
+ */
+function encodeHeader(value: string): string {
+  // Check if value contains non-ASCII characters
+  if (/[^\x00-\x7F]/.test(value)) {
+    const encoded = Buffer.from(value, 'utf-8').toString('base64');
+    return `=?UTF-8?B?${encoded}?=`;
+  }
+  return value;
+}
+
+/**
+ * Convert plain-text body to HTML preserving paragraph structure.
+ * - Double newlines (\n\n) → paragraph breaks (<p>)
+ * - Single newlines within a paragraph → space (avoid mid-sentence <br>)
+ * - Exception: trailing "Name" line in signature separated by \n → <br>
+ */
+function textToHtml(text: string): string {
+  // Escape HTML entities
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Split on double newlines (paragraph breaks)
+  const paragraphs = escaped.split(/\n\n+/);
+
+  return paragraphs
+    .map(para => {
+      // For short paragraphs with a single \n (like "Thanks for considering,\nAnubhav"),
+      // preserve the break. For longer paragraphs, treat \n as a space.
+      const lines = para.split('\n');
+      const html = lines.every(l => l.length < 60)
+        ? lines.join('<br>')        // short lines (signature) → keep breaks
+        : lines.join(' ');          // long lines (prose) → join as one sentence
+      return `<p style="margin:0 0 16px 0;line-height:1.6">${html}</p>`;
+    })
+    .join('');
+}
+
+/**
  * Encode an email message in RFC 2822 format (base64url)
  */
-function encodeEmail(to: string, from: string, subject: string, body: string): string {
+function encodeEmail(to: string, from: string, fromName: string, subject: string, body: string): string {
+  const fromHeader = fromName
+    ? `${encodeHeader(fromName)} <${from}>`
+    : from;
+
+  const htmlBody = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${textToHtml(body)}</body></html>`;
+
   const message = [
     `To: ${to}`,
-    `From: ${from}`,
-    `Subject: ${subject}`,
+    `From: ${fromHeader}`,
+    `Subject: ${encodeHeader(subject)}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Type: text/html; charset=UTF-8',
     '',
-    body,
+    htmlBody,
   ].join('\r\n');
 
   return Buffer.from(message)
@@ -84,9 +131,10 @@ export async function POST(request: NextRequest) {
       subject: string;
       body: string;
       fromEmail?: string;
+      fromName?: string;
     };
 
-    const { to, subject, body: emailBody, fromEmail } = body;
+    const { to, subject, body: emailBody, fromEmail, fromName } = body;
 
     if (!to || !subject || !emailBody) {
       return NextResponse.json(
@@ -127,7 +175,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Build and send the email
-    const raw = encodeEmail(to, senderEmail, subject, emailBody);
+    const raw = encodeEmail(to, senderEmail, fromName || '', subject, emailBody);
 
     const sendRes = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',

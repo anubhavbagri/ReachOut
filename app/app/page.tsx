@@ -131,10 +131,10 @@ export default function SearchPage() {
               <Trash2 className="w-3.5 h-3.5" />
               Clear
             </Button>
-            <Link href="/app/compose">
+            <Link href="/app/send">
               <Button size="sm" className="gap-1.5 h-8 text-xs">
                 <Mail className="w-3.5 h-3.5" />
-                Compose Emails
+                Send Emails
               </Button>
             </Link>
           </div>

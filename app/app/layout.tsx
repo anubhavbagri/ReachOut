@@ -2,21 +2,36 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Settings, Search, Mail, RotateCcw, Send, History } from 'lucide-react';
+import { useEffect } from 'react';
+import { Settings, Search, Send, RotateCcw, History } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 const NAV_LINKS = [
-  { href: '/app',             label: 'Search',      icon: Search  },
-  { href: '/app/manual-send', label: 'Manual Send', icon: Send    },
-  { href: '/app/compose',     label: 'Compose',     icon: Mail    },
-  { href: '/app/follow-ups',  label: 'Follow-ups',  icon: RotateCcw },
-  { href: '/app/revealed',    label: 'Revealed',    icon: History },
-  { href: '/app/settings',    label: 'Settings',    icon: Settings },
+  { href: '/app',            label: 'Search',     icon: Search  },
+  { href: '/app/send',       label: 'Send',        icon: Send    },
+  { href: '/app/follow-ups', label: 'Follow-ups',  icon: RotateCcw },
+  { href: '/app/revealed',   label: 'Revealed',    icon: History },
+  { href: '/app/settings',   label: 'Settings',    icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const emailList = useStore(state => state.emailList);
+  const setGmailState = useStore(state => state.setGmailState);
+
+  // Hydrate Gmail connection status from Supabase on every page load
+  useEffect(() => {
+    async function checkGmail() {
+      try {
+        const res = await fetch('/api/auth/gmail-status');
+        if (res.ok) {
+          const { connected, email } = await res.json();
+          setGmailState(email || '', !!connected);
+        }
+      } catch { /* silent */ }
+    }
+    checkGmail();
+  }, [setGmailState]);
 
   const isActive = (href: string) =>
     href === '/app' ? pathname === '/app' : pathname.startsWith(href);
@@ -53,7 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="truncate">{label}</span>
-              {href === '/app/compose' && emailList.length > 0 && (
+              {href === '/app/send' && emailList.length > 0 && (
                 <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                   {emailList.length}
                 </span>
@@ -105,7 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
                   <div className="relative">
                     <Icon className={`w-5 h-5 transition-transform ${active ? 'scale-110' : ''}`} />
-                    {href === '/app/compose' && emailList.length > 0 && (
+                    {href === '/app/send' && emailList.length > 0 && (
                       <span className="absolute -top-1 -right-1.5 bg-primary text-primary-foreground text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
                         {emailList.length > 9 ? '9+' : emailList.length}
                       </span>
