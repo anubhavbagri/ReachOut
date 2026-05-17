@@ -24,6 +24,7 @@ interface Email {
   prospectTitle: string;
   subject: string;
   body: string;
+  recipientType?: 'HR' | 'HM';
 }
 
 interface EmailBulkSenderProps {
@@ -113,6 +114,7 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           followUpStatus: 'pending',
           followUpCount: 0,
           gmailThreadId: data.threadId,
+          recipientType: email.recipientType || 'HR',
         };
         const { dbInsertSentEmail } = await import('@/lib/supabase-db');
         await dbInsertSentEmail(sentRecord);

@@ -83,23 +83,41 @@ function textToHtml(text: string): string {
 
 /**
  * Encode an email message in RFC 2822 format (base64url)
+ * When replyMessageId is provided, adds In-Reply-To / References headers
+ * so Gmail threads the reply correctly.
  */
-function encodeEmail(to: string, from: string, fromName: string, subject: string, body: string): string {
+function encodeEmail(
+  to: string,
+  from: string,
+  fromName: string,
+  subject: string,
+  body: string,
+  replyMessageId?: string,
+): string {
   const fromHeader = fromName
     ? `${encodeHeader(fromName)} <${from}>`
     : from;
 
   const htmlBody = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${textToHtml(body)}</body></html>`;
 
-  const message = [
+  const headers = [
     `To: ${to}`,
     `From: ${fromHeader}`,
     `Subject: ${encodeHeader(subject)}`,
+  ];
+
+  // Thread reply headers
+  if (replyMessageId) {
+    headers.push(`In-Reply-To: ${replyMessageId}`);
+    headers.push(`References: ${replyMessageId}`);
+  }
+
+  headers.push(
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',
-    '',
-    htmlBody,
-  ].join('\r\n');
+  );
+
+  const message = [...headers, '', htmlBody].join('\r\n');
 
   return Buffer.from(message)
     .toString('base64')
@@ -132,9 +150,10 @@ export async function POST(request: NextRequest) {
       body: string;
       fromEmail?: string;
       fromName?: string;
+      threadId?: string;
     };
 
-    const { to, subject, body: emailBody, fromEmail, fromName } = body;
+    const { to, subject, body: emailBody, fromEmail, fromName, threadId } = body;
 
     if (!to || !subject || !emailBody) {
       return NextResponse.json(
@@ -175,7 +194,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Build and send the email
-    const raw = encodeEmail(to, senderEmail, fromName || '', subject, emailBody);
+    // If threadId is provided, fetch the original message ID for In-Reply-To header
+    let replyMessageId: string | undefined;
+    if (threadId) {
+      try {
+        const threadRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=Message-Id`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (threadRes.ok) {
+          const threadData = await threadRes.json() as { messages?: { payload?: { headers?: { name: string; value: string }[] } }[] };
+          const lastMsg = threadData.messages?.[threadData.messages.length - 1];
+          replyMessageId = lastMsg?.payload?.headers?.find((h: { name: string }) => h.name === 'Message-Id')?.value;
+        }
+      } catch { /* proceed without threading headers */ }
+    }
+
+    const raw = encodeEmail(to, senderEmail, fromName || '', subject, emailBody, replyMessageId);
+
+    const sendPayload: { raw: string; threadId?: string } = { raw };
+    if (threadId) sendPayload.threadId = threadId;
 
     const sendRes = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
@@ -185,7 +223,7 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ raw }),
+        body: JSON.stringify(sendPayload),
       }
     );
 

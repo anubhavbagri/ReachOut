@@ -55,8 +55,16 @@ Bring your own contact list:
 - Every sent email persisted in `sent_emails` table
 - Status: `pending` → `followed_up` → `replied` / `not_interested`
 - Pre-built follow-up templates (3 variants) with editable content
+- **Bulk Sending**: Select multiple pending follow-ups and send them at once
+- **Thread Replies**: Follow-ups are automatically sent as replies to the original email thread
 - Badge shows how many contacts are overdue for follow-up (3+ days)
 - Loads from Supabase on every visit — cross-device sync
+
+### 👥 HR vs Hiring Manager Tracking
+
+- Classify contacts as `HR` or `HM` (Hiring Manager) directly on the search cards
+- Persisted across `revealed_prospects` and `sent_emails` tables
+- View categorization at a glance in the Follow-ups and Revealed dashboards
 
 ### 🔒 Private Login
 
@@ -91,11 +99,12 @@ npm install
 
 ### 2. Supabase — create tables
 
-Go to **Supabase Dashboard → SQL Editor** and run `supabase-schema.sql`:
+Go to **Supabase Dashboard → SQL Editor** and run the consolidated setup script located at [`supabase/schema.sql`](./supabase/schema.sql):
 
 ```sql
--- Creates: sent_emails, app_config
+-- Creates: revealed_prospects, sent_emails, app_config
 -- Sets permissive RLS policies (access controlled by our cookie middleware)
+-- Includes indexes and HR/HM constraints
 ```
 
 ### 3. Environment variables
@@ -179,12 +188,15 @@ lib/
 ├── email-templates.ts       # Preset cold + follow-up templates
 └── api-clients.ts           # Apollo/Hunter/ContactOut (called from API routes)
 
+supabase/
+├── schema.sql               # Complete DB schema (run in Supabase SQL Editor)
+└── migrations/              # Incremental SQL changes
+
 utils/supabase/
 ├── client.ts                # Browser Supabase client
 └── server.ts                # Server Supabase client (API routes)
 
 middleware.ts                # Auth gate — protects /app and /api/*
-supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 ```
 
 ## Deploying to Vercel
@@ -197,6 +209,17 @@ supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 
 ## Supabase Tables
 
+### `revealed_prospects`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | Auto-generated |
+| `email` | text | Revealed email address |
+| `name` / `company` / `title` | text | Prospect info |
+| `source` | text | `apollo` / `hunter` / `contactout` |
+| `recipient_type` | text | `HR` or `HM` |
+| `revealed_at` | timestamptz | |
+
 ### `sent_emails`
 
 | Column | Type | Notes |
@@ -204,11 +227,12 @@ supabase-schema.sql          # Run in Supabase SQL Editor to create tables
 | `id` | text PK | Generated on send |
 | `prospect_name` / `email` / `company` | text | Contact info |
 | `subject` / `body` | text | Email content |
+| `recipient_type` | text | `HR` or `HM` |
 | `sent_at` | timestamptz | |
 | `follow_up_status` | text | `pending` / `followed_up` / `replied` / `not_interested` |
 | `follow_up_count` | int | Increments on each follow-up |
 | `last_follow_up_at` | timestamptz | |
-| `gmail_thread_id` | text | For direct Gmail link |
+| `gmail_thread_id` | text | For direct Gmail link and thread replies |
 
 ### `app_config`
 

@@ -163,6 +163,7 @@ export default function SendPage() {
               <EmailPreview
                 emails={emails}
                 onEmailsChange={setEmails}
+                onFinish={() => setTab('send')}
               />
             )}
           </TabsContent>

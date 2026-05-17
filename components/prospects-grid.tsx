@@ -31,6 +31,7 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
   const [revealingHunter, setRevealingHunter] = useState(false);
   const [apolloDetails, setApolloDetails] = useState<Record<string, unknown> | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [recipientType, setRecipientType] = useState<'HR' | 'HM'>('HR');
 
   const hasEmail = !!prospect.email;
   const inList = isInEmailList(prospect.id);
@@ -53,7 +54,7 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
       const res = await fetch(route, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, recipientType }),
       });
       const data = await res.json();
       
@@ -87,6 +88,7 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
         prospectCompany: prospect.company,
         prospectTitle: prospect.title,
         addedAt: new Date(),
+        recipientType,
       });
       addToast('Added to send list', 'success');
     }
@@ -122,6 +124,18 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
             <LinkedInIcon className="w-4 h-4" />
           </a>
         )}
+        <button
+          type="button"
+          onClick={() => setRecipientType(prev => prev === 'HR' ? 'HM' : 'HR')}
+          className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+            recipientType === 'HR'
+              ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
+              : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
+          }`}
+          title={`Click to toggle: ${recipientType === 'HR' ? 'Human Resources' : 'Hiring Manager'}`}
+        >
+          {recipientType}
+        </button>
       </div>
 
       {/* Row 2: Email reveal OR revealed email */}

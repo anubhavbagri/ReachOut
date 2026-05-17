@@ -47,7 +47,7 @@ interface ReachOutStore {
 
   // Toasts
   toasts: ToastNotification[];
-  addToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  addToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', persistent?: boolean) => void;
   removeToast: (id: string) => void;
 
   // Sent emails cache (loaded from Supabase on follow-ups page)
@@ -120,10 +120,12 @@ export const useStore = create<ReachOutStore>()(
 
       // ── Toasts ────────────────────────────────────────────────────────────
       toasts: [],
-      addToast: (msg, type = 'info') => {
+      addToast: (msg, type = 'info', persistent = false) => {
         const id = Math.random().toString(36).slice(2);
         set(s => ({ toasts: [...s.toasts, { id, message: msg, type }] }));
-        setTimeout(() => get().removeToast(id), 3500);
+        if (!persistent) {
+          setTimeout(() => get().removeToast(id), 3500);
+        }
       },
       removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 

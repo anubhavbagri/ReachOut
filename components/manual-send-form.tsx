@@ -193,7 +193,7 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
           email: entry.prospectEmail,
           company: entry.prospectCompany,
           title: entry.prospectTitle || '',
-          recipientType: 'HR' as const,
+          recipientType: entry.recipientType || 'HR',
         };
       });
       const existingIds = new Set(hydrated.map(c => c.id));
@@ -387,6 +387,7 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
           prospectTitle: c.title,
           subject: generated.subject,
           body: generated.body,
+          recipientType: c.recipientType || 'HR',
         });
       } catch (err) {
         console.error(`Failed for ${c.email}:`, err);
@@ -404,6 +405,7 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
           prospectTitle: c.title,
           subject: applyTemplate(fbSubject, vars),
           body: applyTemplate(fbBody, vars),
+          recipientType: c.recipientType || 'HR',
         });
       }
 

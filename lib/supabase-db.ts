@@ -20,6 +20,7 @@ export interface RevealedProspect {
   email: string;
   source: string;
   revealed_at?: Date;
+  recipient_type?: 'HR' | 'HM';
 }
 
 // ─── Sent Emails ─────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ export async function dbInsertRevealedProspect(p: RevealedProspect): Promise<voi
     company: p.company,
     email: p.email,
     source: p.source,
+    recipient_type: p.recipient_type || 'HR',
   };
   const { error } = await supabase.from('revealed_prospects').insert(row);
   if (error) console.error('[DB] insertRevealedProspect:', error);
@@ -97,6 +99,7 @@ export async function dbGetRevealedProspects(): Promise<RevealedProspect[]> {
     email: row.email,
     source: row.source,
     revealed_at: new Date(row.revealed_at),
+    recipient_type: row.recipient_type || 'HR',
   }));
 }
 
@@ -145,6 +148,7 @@ function rowToSentEmail(row: Record<string, unknown>): SentEmail {
     lastFollowUpAt: row.last_follow_up_at ? new Date(row.last_follow_up_at as string) : undefined,
     notes: row.notes as string | undefined,
     gmailThreadId: row.gmail_thread_id as string | undefined,
+    recipientType: (row.recipient_type as 'HR' | 'HM') || 'HR',
   };
 }
 
@@ -164,5 +168,6 @@ function sentEmailToRow(e: SentEmail): Record<string, unknown> {
     last_follow_up_at: e.lastFollowUpAt?.toISOString() ?? null,
     notes: e.notes ?? null,
     gmail_thread_id: e.gmailThreadId ?? null,
+    recipient_type: e.recipientType || 'HR',
   };
 }

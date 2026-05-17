@@ -4,7 +4,7 @@ import { dbInsertRevealedProspect } from '@/lib/supabase-db';
 
 export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
-  const { prospectId } = await req.json() as { prospectId: string };
+  const { prospectId, recipientType } = await req.json() as { prospectId: string; recipientType?: 'HR' | 'HM' };
   const key = process.env.APOLLO_API_KEY;
   if (!key) return NextResponse.json({ error: 'APOLLO_API_KEY not set' }, { status: 500 });
   try {
@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
         organization_id: d.organization_id as string | undefined,
         company: companyName as string | undefined,
         email: result.email,
-        source: 'apollo'
+        source: 'apollo',
+        recipient_type: recipientType || 'HR',
       });
     }
 

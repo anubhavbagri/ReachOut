@@ -18,9 +18,10 @@ interface Email {
 interface EmailPreviewProps {
   emails: Email[];
   onEmailsChange: (emails: Email[]) => void;
+  onFinish?: () => void;
 }
 
-export function EmailPreview({ emails, onEmailsChange }: EmailPreviewProps) {
+export function EmailPreview({ emails, onEmailsChange, onFinish }: EmailPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editSubject, setEditSubject] = useState('');
@@ -162,14 +163,24 @@ export function EmailPreview({ emails, onEmailsChange }: EmailPreviewProps) {
           ))}
         </div>
 
-        <Button
-          onClick={handleNext}
-          disabled={currentIndex === emails.length - 1}
-          className="gap-2"
-        >
-          Next
-          <ChevronRight className="w-4 h-4" />
-        </Button>
+        {currentIndex === emails.length - 1 ? (
+          <Button
+            onClick={onFinish}
+            className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+          >
+            Send Emails
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            onClick={handleNext}
+            className="gap-2"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

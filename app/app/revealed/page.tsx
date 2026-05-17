@@ -115,6 +115,7 @@ export default function RevealedPage() {
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium hidden md:table-cell">Title</th>
                     <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Type</th>
                     <th className="px-4 py-3 font-medium hidden sm:table-cell">Source</th>
                     <th className="px-4 py-3 font-medium hidden lg:table-cell">Revealed</th>
                   </tr>
@@ -162,6 +163,15 @@ export default function RevealedPage() {
                             <Mail className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate max-w-[180px]">{p.email}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            (p.recipient_type || 'HR') === 'HR'
+                              ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
+                              : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
+                          }`}>
+                            {p.recipient_type || 'HR'}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell capitalize">{p.source}</td>
                         <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">

@@ -113,6 +113,7 @@ export interface SentEmail {
   lastFollowUpAt?: Date;
   notes?: string;
   gmailThreadId?: string;
+  recipientType?: 'HR' | 'HM';
 }
 
 // Email list for bulk sending — prospects whose emails have been revealed
@@ -123,4 +124,5 @@ export interface EmailListEntry {
   prospectCompany: string;
   prospectTitle: string;
   addedAt: Date;
+  recipientType?: 'HR' | 'HM';
 }
