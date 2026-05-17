@@ -64,7 +64,7 @@ Best,
 // ─── Cold Email Templates (compose page) ───────────────────────────────────────────
 // Includes the canonical HR & HM templates so compose and manual-send stay in sync.
 
-export const COLD_EMAIL_TEMPLATES: EmailTemplate[] = [
+const COLD_EMAIL_TEMPLATES: EmailTemplate[] = [
   HR_OUTREACH_TEMPLATE,
   {
     id: 'referral-ask',
@@ -144,7 +144,7 @@ export function applyTemplate(
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
 }
 
-export function getTemplateVariables(template: string): string[] {
+function getTemplateVariables(template: string): string[] {
   const matches = template.matchAll(/\{\{(\w+)\}\}/g);
   return [...new Set(Array.from(matches).map(m => m[1]))];
 }

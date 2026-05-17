@@ -117,7 +117,7 @@ export async function dbGetConfig(key: string): Promise<string | null> {
   return data?.value ?? null;
 }
 
-export async function dbSetConfig(key: string, value: string): Promise<void> {
+async function dbSetConfig(key: string, value: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from('app_config')

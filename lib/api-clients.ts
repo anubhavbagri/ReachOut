@@ -26,7 +26,7 @@ export function isValidDomain(input: string): boolean {
 
 // ─── Apollo People Search ────────────────────────────────────────────────────
 
-export interface ApolloPersonRaw {
+interface ApolloPersonRaw {
   id: string;
   first_name: string;
   last_name?: string;              // full last name (old endpoint)
@@ -48,7 +48,7 @@ export interface ApolloPersonRaw {
   };
 }
 
-export interface ApolloSearchResponse {
+interface ApolloSearchResponse {
   people: ApolloPersonRaw[];
   contacts?: ApolloPersonRaw[];
   pagination?: {
@@ -128,7 +128,7 @@ export async function apolloSearchByDomain(
 
 // ─── Apollo People Enrichment (reveal email) ─────────────────────────────────
 
-export interface ApolloEnrichResponse {
+interface ApolloEnrichResponse {
   person: {
     id: string;
     email?: string;
@@ -219,7 +219,7 @@ export async function hunterFindEmail(
 
 // ─── ContactOut Contact Info ─────────────────────────────────────────────────
 
-export interface ContactOutResponse {
+interface ContactOutResponse {
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -290,6 +290,6 @@ export function sanitizeProspect(prospect: Partial<Prospect>): Prospect {
   };
 }
 
-export function isValidEmail(email: string): boolean {
+function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

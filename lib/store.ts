@@ -9,7 +9,7 @@ import { persist } from 'zustand/middleware';
 import { SearchState, Prospect, ComposeState, ToastNotification, EmailListEntry, SentEmail } from './types';
 import { DEFAULT_PERSON_TITLES } from './api-clients';
 
-export interface UIPreferences {
+interface UIPreferences {
   personTitles: string[];
   emailDelayMs: number;
   senderName: string;

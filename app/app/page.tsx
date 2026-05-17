@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { SearchProspectsForm } from '@/components/search-form';
 import { ProspectsGrid } from '@/components/prospects-grid';
@@ -156,6 +156,11 @@ export default function SearchPage() {
   const [hunterDomain, setHunterDomain] = useState('');
   const [hunterLoading, setHunterLoading] = useState(false);
   const [hunterResult, setHunterResult] = useState<HunterResult | null>(null);
+
+  // Clear hunter result when Apollo search starts
+  useEffect(() => {
+    if (search.loading) setHunterResult(null);
+  }, [search.loading]);
 
   const handleHunterSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,6 +326,8 @@ export default function SearchPage() {
               <p className="text-muted-foreground text-sm">Searching Apollo...</p>
             </div>
           </div>
+        ) : search.results.length > 0 ? (
+          <ProspectsGrid prospects={search.results} />
         ) : hunterResult ? (
           <div className="p-4 md:p-6 space-y-4">
             <p className="text-sm text-muted-foreground font-medium">Hunter result</p>
@@ -328,8 +335,6 @@ export default function SearchPage() {
               <HunterResultCard result={hunterResult} onDismiss={() => setHunterResult(null)} />
             </div>
           </div>
-        ) : search.results.length > 0 ? (
-          <ProspectsGrid prospects={search.results} />
         ) : search.error ? (
           <div className="flex items-center justify-center h-full p-6">
             <div className="text-center space-y-3 max-w-sm">
