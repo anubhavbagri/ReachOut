@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         last_name: d.last_name as string | undefined,
         name: d.name as string | undefined,
         linkedin_url: d.linkedin_url as string | undefined,
-        title: d.title as string | undefined,
+        title: (d.title as string | undefined) || 'Recruiter',
         organization_id: d.organization_id as string | undefined,
         company: companyName as string | undefined,
         email: result.email,

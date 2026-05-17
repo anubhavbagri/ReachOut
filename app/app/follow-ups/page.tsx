@@ -6,7 +6,6 @@ import { SentEmail } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Search, Mail, Clock, Send, CheckCircle2, XCircle, ExternalLink, RefreshCw, Loader2, MessageSquareReply } from 'lucide-react';
+import { Search, Mail, Clock, Send, CheckCircle2, XCircle, ExternalLink, RefreshCw, Loader2, MessageSquareReply, ThumbsUp, ThumbsDown, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { FOLLOWUP_TEMPLATES, applyTemplate } from '@/lib/email-templates';
 import { dbGetSentEmails, dbUpdateSentEmail } from '@/lib/supabase-db';
@@ -33,9 +32,19 @@ const STATUS_CONFIG = {
     icon: RefreshCw,
   },
   replied: {
-    label: 'Replied ✓',
+    label: 'Replied',
     color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     icon: MessageSquareReply,
+  },
+  replied_positive: {
+    label: 'Replied ✓',
+    color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+    icon: ThumbsUp,
+  },
+  replied_negative: {
+    label: 'Replied ✗',
+    color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    icon: ThumbsDown,
   },
   not_interested: {
     label: 'Archived',
@@ -91,7 +100,7 @@ export default function FollowUpsPage() {
       case 'follow-up-3':
         return sentEmails.filter(e => e.followUpStatus === 'followed_up' && e.followUpCount >= 3);
       case 'replied':
-        return sentEmails.filter(e => e.followUpStatus === 'replied');
+        return sentEmails.filter(e => e.followUpStatus === 'replied' || e.followUpStatus === 'replied_positive' || e.followUpStatus === 'replied_negative');
       case 'not_interested':
         return sentEmails.filter(e => e.followUpStatus === 'not_interested');
     }
@@ -109,7 +118,7 @@ export default function FollowUpsPage() {
     'follow-up-1': sentEmails.filter(e => e.followUpStatus === 'followed_up' && e.followUpCount === 1).length,
     'follow-up-2': sentEmails.filter(e => e.followUpStatus === 'followed_up' && e.followUpCount === 2).length,
     'follow-up-3': sentEmails.filter(e => e.followUpStatus === 'followed_up' && e.followUpCount >= 3).length,
-    replied: sentEmails.filter(e => e.followUpStatus === 'replied').length,
+    replied: sentEmails.filter(e => e.followUpStatus === 'replied' || e.followUpStatus === 'replied_positive' || e.followUpStatus === 'replied_negative').length,
     not_interested: sentEmails.filter(e => e.followUpStatus === 'not_interested').length,
   };
 
@@ -118,16 +127,30 @@ export default function FollowUpsPage() {
     return e.followUpStatus === 'pending' && days >= 3;
   }).length;
 
-  const handleMarkReplied = async (email: SentEmail) => {
-    updateSentEmailCache(email.id, { followUpStatus: 'replied' });
-    await dbUpdateSentEmail(email.id, { followUpStatus: 'replied' });
-    addToast('Marked as replied', 'success');
+  const handleMarkRepliedPositive = async (email: SentEmail) => {
+    updateSentEmailCache(email.id, { followUpStatus: 'replied_positive' });
+    await dbUpdateSentEmail(email.id, { followUpStatus: 'replied_positive' });
+    addToast('Marked as replied (positive) 👍', 'success');
+  };
+
+  const handleMarkRepliedNegative = async (email: SentEmail) => {
+    updateSentEmailCache(email.id, { followUpStatus: 'replied_negative' });
+    await dbUpdateSentEmail(email.id, { followUpStatus: 'replied_negative' });
+    addToast('Marked as replied (negative) 👎', 'info');
   };
 
   const handleMarkNotInterested = async (email: SentEmail) => {
     updateSentEmailCache(email.id, { followUpStatus: 'not_interested' });
     await dbUpdateSentEmail(email.id, { followUpStatus: 'not_interested' });
     addToast('Marked as archived', 'info');
+  };
+
+  const handleUndoReplied = async (email: SentEmail) => {
+    // Revert to followed_up if they had any follow-ups, otherwise back to pending
+    const revertStatus = email.followUpCount > 0 ? 'followed_up' : 'pending';
+    updateSentEmailCache(email.id, { followUpStatus: revertStatus });
+    await dbUpdateSentEmail(email.id, { followUpStatus: revertStatus });
+    addToast(`Moved back to ${revertStatus === 'followed_up' ? 'Followed Up' : 'Needs Follow-up'}`, 'info');
   };
 
   const handleOpenInGmail = (email: SentEmail) => {
@@ -237,7 +260,7 @@ export default function FollowUpsPage() {
     addToast(`${sent}/${targets.length} follow-ups sent successfully.`, sent > 0 ? 'success' : 'error');
   };
 
-  const handleBulkStatusUpdate = (status: 'replied' | 'not_interested') => {
+  const handleBulkStatusUpdate = (status: 'replied_positive' | 'replied_negative' | 'not_interested') => {
     const targets = filtered.filter(e => selected.has(e.id));
     if (targets.length === 0) return;
 
@@ -248,7 +271,7 @@ export default function FollowUpsPage() {
     });
 
     setSelected(new Set());
-    addToast(`Marked ${targets.length} emails as ${status === 'replied' ? 'Replied' : 'Archived'}`, 'success');
+    addToast(`Marked ${targets.length} emails as ${status === 'not_interested' ? 'Archived' : 'Replied'}`, 'success');
   };
 
   const tabs: { key: Tab; label: string }[] = [
@@ -283,9 +306,13 @@ export default function FollowUpsPage() {
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
               {tab === 'follow-up-3' ? (
                 <>
-                  <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleBulkStatusUpdate('replied')}>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Mark Replied
+                  <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleBulkStatusUpdate('replied_positive')}>
+                    <ThumbsUp className="w-3.5 h-3.5" />
+                    Replied (+)
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleBulkStatusUpdate('replied_negative')}>
+                    <ThumbsDown className="w-3.5 h-3.5" />
+                    Replied (-)
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleBulkStatusUpdate('not_interested')}>
                     <XCircle className="w-3.5 h-3.5" />
@@ -312,8 +339,8 @@ export default function FollowUpsPage() {
                 setSelected(new Set());
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === t.key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
                 }`}
             >
               {t.label} ({counts[t.key]})
@@ -385,8 +412,8 @@ export default function FollowUpsPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${(email.recipientType || 'HR') === 'HR'
-                            ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
-                            : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
+                          ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
+                          : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
                           }`}>
                           {email.recipientType || 'HR'}
                         </span>
@@ -405,18 +432,26 @@ export default function FollowUpsPage() {
                         {needsAction && <span className="text-yellow-600 dark:text-yellow-400 font-medium ml-1">⚡ Due</span>}
                       </span>
                       <div className="flex items-center gap-0.5">
-                        {email.followUpStatus !== 'replied' && email.followUpStatus !== 'not_interested' && (
+                        {email.followUpStatus !== 'replied' && email.followUpStatus !== 'replied_positive' && email.followUpStatus !== 'replied_negative' && email.followUpStatus !== 'not_interested' && (
                           <>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Log Follow-up" onClick={(e) => { e.stopPropagation(); openBulkDialog(email); }}>
                               <Send className="w-3.5 h-3.5" />
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" title="Mark Replied" onClick={(e) => { e.stopPropagation(); handleMarkReplied(email); }}>
-                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Replied (Positive)" onClick={(e) => { e.stopPropagation(); handleMarkRepliedPositive(email); }}>
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" title="Replied (Negative)" onClick={(e) => { e.stopPropagation(); handleMarkRepliedNegative(email); }}>
+                              <ThumbsDown className="w-3.5 h-3.5" />
                             </Button>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" title="Archive" onClick={(e) => { e.stopPropagation(); handleMarkNotInterested(email); }}>
                               <XCircle className="w-3.5 h-3.5" />
                             </Button>
                           </>
+                        )}
+                        {(email.followUpStatus === 'replied' || email.followUpStatus === 'replied_positive' || email.followUpStatus === 'replied_negative') && (
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Undo — move back" onClick={(e) => { e.stopPropagation(); handleUndoReplied(email); }}>
+                            <Undo2 className="w-3.5 h-3.5" />
+                          </Button>
                         )}
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Open in Gmail" onClick={(e) => { e.stopPropagation(); handleOpenInGmail(email); }}>
                           <ExternalLink className="w-3.5 h-3.5" />
@@ -488,8 +523,8 @@ export default function FollowUpsPage() {
                         </td>
                         <td className="py-3 px-3">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${(email.recipientType || 'HR') === 'HR'
-                              ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
-                              : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
+                            ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
+                            : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
                             }`}>
                             {email.recipientType || 'HR'}
                           </span>
@@ -502,18 +537,26 @@ export default function FollowUpsPage() {
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center justify-end gap-1">
-                            {email.followUpStatus !== 'replied' && email.followUpStatus !== 'not_interested' && (
+                            {email.followUpStatus !== 'replied' && email.followUpStatus !== 'replied_positive' && email.followUpStatus !== 'replied_negative' && email.followUpStatus !== 'not_interested' && (
                               <>
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Log Follow-up" onClick={(e) => { e.stopPropagation(); openBulkDialog(email); }}>
                                   <Send className="w-3.5 h-3.5" />
                                 </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" title="Mark Replied" onClick={(e) => { e.stopPropagation(); handleMarkReplied(email); }}>
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Replied (Positive)" onClick={(e) => { e.stopPropagation(); handleMarkRepliedPositive(email); }}>
+                                  <ThumbsUp className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" title="Replied (Negative)" onClick={(e) => { e.stopPropagation(); handleMarkRepliedNegative(email); }}>
+                                  <ThumbsDown className="w-3.5 h-3.5" />
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" title="Archive" onClick={(e) => { e.stopPropagation(); handleMarkNotInterested(email); }}>
                                   <XCircle className="w-3.5 h-3.5" />
                                 </Button>
                               </>
+                            )}
+                            {(email.followUpStatus === 'replied' || email.followUpStatus === 'replied_positive' || email.followUpStatus === 'replied_negative') && (
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Undo — move back" onClick={(e) => { e.stopPropagation(); handleUndoReplied(email); }}>
+                                <Undo2 className="w-3.5 h-3.5" />
+                              </Button>
                             )}
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Open in Gmail" onClick={(e) => { e.stopPropagation(); handleOpenInGmail(email); }}>
                               <ExternalLink className="w-3.5 h-3.5" />

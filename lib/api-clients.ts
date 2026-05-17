@@ -171,9 +171,12 @@ export interface HunterEmailFinderResponse {
   data: {
     email: string | null;
     score: number;
-    position?: string;
+    position?: string | null;
     first_name?: string;
     last_name?: string;
+    domain?: string;
+    company?: string;
+    linkedin_url?: string | null;
     sources?: Array<{ domain: string; uri: string }>;
   };
 }
@@ -186,17 +189,32 @@ export async function hunterFindEmail(
   lastName: string,
   domain: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<HunterEmailFinderResponse['data'] | null> {
   const params = new URLSearchParams({
     domain,
     first_name: firstName,
     last_name: lastName,
     api_key: apiKey,
   });
-  const response = await axios.get<HunterEmailFinderResponse>(
-    `https://api.hunter.io/v2/email-finder?${params.toString()}`
-  );
-  return response.data?.data?.email || null;
+
+  try {
+    const response = await axios.get<HunterEmailFinderResponse>(
+      `https://api.hunter.io/v2/email-finder?${params.toString()}`
+    );
+    console.log('Hunter API Success response:', response.data);
+    return response.data?.data || null;
+  } catch (error: any) {
+    console.error(
+      'Hunter API Error Status:',
+      error.response?.status,
+      'Response:',
+      JSON.stringify(error.response?.data) || error.message
+    );
+    if (error.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 // ─── ContactOut Contact Info ─────────────────────────────────────────────────
@@ -226,15 +244,18 @@ export async function contactOutFindEmail(
   const url = linkedinUrl.startsWith('http') ? linkedinUrl : `https://${linkedinUrl}`;
 
   const response = await axios.get<ContactOutResponse>(
-    'https://api.contactout.com/v2/contact/info',
+    'https://api.contactout.com/v1/linkedin/enrich',
     {
-      params: { linkedin: url },
+      params: { profile: url },
       headers: {
-        Authorization: `Token ${apiKey}`,
+        'token': apiKey,
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     }
   );
+
+  console.log('ContactOut API Raw Response:', JSON.stringify(response.data, null, 2));
 
   const profile = response.data?.profile;
   if (!profile) return { email: null, profile: null };

@@ -108,7 +108,7 @@ export interface SentEmail {
   subject: string;
   body: string;
   sentAt: Date;
-  followUpStatus: 'pending' | 'followed_up' | 'replied' | 'not_interested';
+  followUpStatus: 'pending' | 'followed_up' | 'replied' | 'replied_positive' | 'replied_negative' | 'not_interested';
   followUpCount: number;
   lastFollowUpAt?: Date;
   notes?: string;

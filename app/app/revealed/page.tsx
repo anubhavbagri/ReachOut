@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { dbGetRevealedProspects, RevealedProspect } from '@/lib/supabase-db';
-import { Mail, Clock, ExternalLink, Send } from 'lucide-react';
+import { Mail, Clock, ExternalLink, Send, Download } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -61,6 +61,48 @@ export default function RevealedPage() {
     setSelected(new Set());
   };
 
+  const handleExport = () => {
+    const toExport = prospects.filter(p => selected.has(p.apollo_id || p.id || ''));
+    if (toExport.length === 0) return;
+
+    // Excel compatible UTF-8 BOM
+    const BOM = '\uFEFF';
+    const headers = ['Company', 'Name', 'Title', 'Email', 'Recipient Type', 'Source', 'Revealed At'];
+    const rows = toExport.map(p => [
+      p.company || '',
+      p.name || p.first_name || '',
+      p.title || '',
+      p.email || '',
+      p.recipient_type || 'HR',
+      p.source || '',
+      p.revealed_at ? new Date(p.revealed_at).toLocaleDateString() : '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => 
+        row.map(val => {
+          const stringified = String(val).replace(/"/g, '""');
+          return stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')
+            ? `"${stringified}"`
+            : stringified;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `revealed_prospects_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addToast(`Successfully exported ${toExport.length} prospects!`, 'success');
+  };
+
   return (
     <div className="flex flex-col h-full bg-muted/20">
       {/* Header */}
@@ -77,11 +119,10 @@ export default function RevealedPage() {
               <Send className="w-3.5 h-3.5" />
               Add to Send List
             </Button>
-            <Link href="/app/send">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs">
-                Go to Send
-              </Button>
-            </Link>
+            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-green-700 hover:text-green-800 hover:bg-green-50 border-green-200" onClick={handleExport}>
+              <Download className="w-3.5 h-3.5" />
+              Export
+            </Button>
           </div>
         )}
       </div>
