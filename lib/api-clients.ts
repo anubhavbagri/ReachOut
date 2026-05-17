@@ -81,7 +81,7 @@ export async function apolloSearchByDomain(
   domain: string,
   apiKey: string,
   personTitles: string[] = DEFAULT_PERSON_TITLES,
-  perPage = 25
+  perPage = 100
 ): Promise<Prospect[]> {
   const response = await axios.post<ApolloSearchResponse>(
     'https://api.apollo.io/api/v1/mixed_people/api_search',
