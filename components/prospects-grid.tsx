@@ -3,30 +3,14 @@
 import { useState } from 'react';
 import { Prospect } from '@/lib/types';
 import { useStore } from '@/lib/store';
-import {
-  apolloRevealEmail,
-  hunterFindEmail,
-  contactOutFindEmail,
-  normalizeDomain,
-} from '@/lib/api-clients';
+import { normalizeDomain } from '@/lib/api-clients';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
-  Briefcase,
-  Building2,
-  Mail,
-  ExternalLink,
-  Loader2,
-  Linkedin,
-  Plus,
-  CheckCircle2,
-  EyeOff,
+  Briefcase, Building2, Mail, ExternalLink,
+  Loader2, Plus, CheckCircle2, EyeOff, Info
 } from 'lucide-react';
-
-interface ProspectsGridProps {
-  prospects: Prospect[];
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function LinkedInIcon({ className }: { className?: string }) {
   return (
@@ -37,16 +21,17 @@ function LinkedInIcon({ className }: { className?: string }) {
 }
 
 function ProspectCard({ prospect }: { prospect: Prospect }) {
-  const updateProspectEmail = useStore(state => state.updateProspectEmail);
-  const addToast = useStore(state => state.addToast);
-  const settings = useStore(state => state.settings);
-  const addToEmailList = useStore(state => state.addToEmailList);
-  const removeFromEmailList = useStore(state => state.removeFromEmailList);
-  const isInEmailList = useStore(state => state.isInEmailList);
+  const updateProspectEmail = useStore(s => s.updateProspectEmail);
+  const addToast = useStore(s => s.addToast);
+  const addToEmailList = useStore(s => s.addToEmailList);
+  const removeFromEmailList = useStore(s => s.removeFromEmailList);
+  const isInEmailList = useStore(s => s.isInEmailList);
 
   const [revealingApollo, setRevealingApollo] = useState(false);
   const [revealingHunter, setRevealingHunter] = useState(false);
-  const [revealingContactOut, setRevealingContactOut] = useState(false);
+  const [apolloDetails, setApolloDetails] = useState<Record<string, unknown> | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [recipientType, setRecipientType] = useState<'HR' | 'HM'>('HR');
 
   const hasEmail = !!prospect.email;
   const inList = isInEmailList(prospect.id);
@@ -59,81 +44,39 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
     ? (prospect.linkedin.startsWith('http') ? prospect.linkedin : `https://${prospect.linkedin}`)
     : null;
 
-  // ── Reveal handlers ──────────────────────────────────────────────────────
-
-  const handleRevealApollo = async () => {
-    if (!settings.apolloApiKey) {
-      addToast('Add your Apollo API key in Settings', 'warning'); return;
-    }
-    setRevealingApollo(true);
+  async function revealViaRoute(
+    route: string,
+    body: object,
+    setter: (v: boolean) => void
+  ) {
+    setter(true);
     try {
-      const email = await apolloRevealEmail(prospect.id, settings.apolloApiKey);
-      if (email) {
-        updateProspectEmail(prospect.id, email);
-        addToast(`Email found: ${email}`, 'success');
-      } else {
-        addToast('Apollo: No email found for this person', 'info');
+      const res = await fetch(route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, recipientType }),
+      });
+      const data = await res.json();
+      
+      if (route.includes('apollo') && data.details) {
+        setApolloDetails(data.details);
       }
-    } catch (err) {
-      addToast(`Apollo error: ${err instanceof Error ? err.message : 'Failed'}`, 'error');
-    } finally {
-      setRevealingApollo(false);
-    }
-  };
 
-  const handleRevealHunter = async () => {
-    if (!settings.hunterApiKey) {
-      addToast('Add your Hunter API key in Settings', 'warning'); return;
-    }
-    setRevealingHunter(true);
-    try {
-      const email = await hunterFindEmail(
-        prospect.firstName,
-        prospect.lastName,
-        domain,
-        settings.hunterApiKey
-      );
-      if (email) {
-        updateProspectEmail(prospect.id, email);
-        addToast(`Email found: ${email}`, 'success');
+      if (data.email) {
+        updateProspectEmail(prospect.id, data.email);
+        addToast(`Email found: ${data.email}`, 'success');
       } else {
-        addToast('Hunter: No email found for this person', 'info');
+        addToast(data.error || 'No email found', 'info');
       }
-    } catch (err) {
-      addToast(`Hunter error: ${err instanceof Error ? err.message : 'Failed'}`, 'error');
+    } catch {
+      addToast('Request failed', 'error');
     } finally {
-      setRevealingHunter(false);
+      setter(false);
     }
-  };
-
-  const handleRevealContactOut = async () => {
-    if (!settings.contactOutApiKey) {
-      addToast('Add your ContactOut API key in Settings', 'warning'); return;
-    }
-    if (!linkedinUrl) {
-      addToast('ContactOut requires a LinkedIn profile URL', 'info'); return;
-    }
-    setRevealingContactOut(true);
-    try {
-      const email = await contactOutFindEmail(linkedinUrl, settings.contactOutApiKey);
-      if (email) {
-        updateProspectEmail(prospect.id, email);
-        addToast(`Email found: ${email}`, 'success');
-      } else {
-        addToast('ContactOut: No email found for this person', 'info');
-      }
-    } catch (err) {
-      addToast(`ContactOut error: ${err instanceof Error ? err.message : 'Failed'}`, 'error');
-    } finally {
-      setRevealingContactOut(false);
-    }
-  };
+  }
 
   const handleToggleList = () => {
-    if (!hasEmail) {
-      addToast('Reveal an email first before adding to send list', 'info');
-      return;
-    }
+    if (!hasEmail) { addToast('Reveal email first', 'info'); return; }
     if (inList) {
       removeFromEmailList(prospect.id);
       addToast('Removed from send list', 'info');
@@ -145,6 +88,7 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
         prospectCompany: prospect.company,
         prospectTitle: prospect.title,
         addedAt: new Date(),
+        recipientType,
       });
       addToast('Added to send list', 'success');
     }
@@ -158,118 +102,149 @@ function ProspectCard({ prospect }: { prospect: Prospect }) {
           <h3 className="font-semibold text-base leading-tight truncate">
             {prospect.firstName} {prospect.lastName}
           </h3>
-          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
-            <Briefcase className="w-3 h-3 shrink-0" />
-            <span className="truncate">{prospect.title || '—'}</span>
-          </p>
+          {prospect.title && (
+            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
+              <Briefcase className="w-3 h-3 shrink-0" />
+              <span className="truncate">{prospect.title}</span>
+            </p>
+          )}
           <p className="text-sm text-primary font-medium flex items-center gap-1 truncate">
             <Building2 className="w-3 h-3 shrink-0" />
-            <span className="truncate">{prospect.company}</span>
+            {prospect.website ? (
+              <a
+                href={prospect.website.startsWith('http') ? prospect.website : `https://${prospect.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="truncate hover:underline underline-offset-2"
+              >
+                {prospect.company}
+              </a>
+            ) : (
+              <span className="truncate">{prospect.company}</span>
+            )}
           </p>
         </div>
+        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setRecipientType(prev => prev === 'HR' ? 'HM' : 'HR')}
+            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors h-7 flex items-center justify-center ${
+              recipientType === 'HR'
+                ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'
+                : 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800'
+            }`}
+            title={`Click to toggle: ${recipientType === 'HR' ? 'Human Resources' : 'Hiring Manager'}`}
+          >
+            {recipientType}
+          </button>
 
-        {linkedinUrl && (
           <a
-            href={linkedinUrl}
+            href={(() => {
+              const isObfuscated = prospect.lastName?.includes('*');
+              const parts = [prospect.firstName, isObfuscated ? '' : (prospect.lastName || ''), prospect.title || '', prospect.company || ''].filter(Boolean);
+              return `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(parts.join(' ').trim())}`;
+            })()}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 w-8 h-8 rounded-lg bg-[#0077b5]/10 flex items-center justify-center text-[#0077b5] hover:bg-[#0077b5]/20 transition-colors"
-            title={`${prospect.firstName}'s LinkedIn`}
             onClick={e => e.stopPropagation()}
+            className="w-7 h-7 rounded-lg bg-[#0077b5]/10 flex items-center justify-center text-[#0077b5] hover:bg-[#0077b5]/20 transition-colors"
+            title={`Search ${prospect.firstName} on LinkedIn`}
           >
-            <LinkedInIcon className="w-4 h-4" />
+            <LinkedInIcon className="w-3.5 h-3.5" />
           </a>
-        )}
+        </div>
       </div>
 
-      {/* Row 2: Email reveal buttons OR revealed email */}
-      <div>
-        {hasEmail ? (
+      {/* Row 2+3: Reveal / email + Add to list */}
+      {hasEmail ? (
+        <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
             <Mail className="w-3.5 h-3.5 text-green-600 shrink-0" />
             <span className="text-xs font-medium text-green-700 dark:text-green-400 truncate flex-1">
               {prospect.email}
             </span>
           </div>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {/* Apollo button — always shown (required key) */}
+          <div className="flex gap-2">
+            {apolloDetails && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs flex-1 text-muted-foreground"
+                onClick={() => setShowDetailsModal(true)}
+              >
+                <Info className="w-3.5 h-3.5 mr-1" /> Apollo Details
+              </Button>
+            )}
             <Button
               size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 px-2 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30 flex-1 min-w-0"
-              onClick={handleRevealApollo}
-              disabled={revealingApollo || !settings.apolloApiKey}
-              title={!settings.apolloApiKey ? 'Add Apollo API key in Settings' : 'Find email via Apollo'}
+              variant={inList ? 'default' : 'outline'}
+              className="h-8 text-xs gap-1.5 flex-1"
+              onClick={handleToggleList}
             >
-              {revealingApollo ? <Loader2 className="w-3 h-3 animate-spin shrink-0" /> : null}
-              <span className="truncate">Apollo</span>
-            </Button>
-
-            {/* Hunter button — only if key set */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 px-2 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/30 flex-1 min-w-0"
-              onClick={handleRevealHunter}
-              disabled={revealingHunter || !settings.hunterApiKey}
-              title={!settings.hunterApiKey ? 'Add Hunter API key in Settings' : 'Find email via Hunter'}
-            >
-              {revealingHunter ? <Loader2 className="w-3 h-3 animate-spin shrink-0" /> : null}
-              <span className="truncate">Hunter</span>
-            </Button>
-
-            {/* ContactOut button — only if key set */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 px-2 border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-950/30 flex-1 min-w-0"
-              onClick={handleRevealContactOut}
-              disabled={revealingContactOut || !settings.contactOutApiKey || !linkedinUrl}
-              title={
-                !settings.contactOutApiKey
-                  ? 'Add ContactOut API key in Settings'
-                  : !linkedinUrl
-                  ? 'LinkedIn URL required'
-                  : 'Find email via ContactOut'
-              }
-            >
-              {revealingContactOut ? <Loader2 className="w-3 h-3 animate-spin shrink-0" /> : null}
-              <span className="truncate">ContactOut</span>
+              {inList ? (
+                <><CheckCircle2 className="w-3.5 h-3.5" />In list</>
+              ) : (
+                <><Plus className="w-3.5 h-3.5" />Add to list</>
+              )}
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30 flex-1"
+              onClick={() => revealViaRoute('/api/reveal/apollo', { prospectId: prospect.id }, setRevealingApollo)}
+              disabled={revealingApollo}
+            >
+              {revealingApollo ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+              Apollo
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 flex-1 text-muted-foreground"
+              onClick={handleToggleList}
+              disabled={!hasEmail}
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+              Add to list
+            </Button>
+          </div>
+          {apolloDetails && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs w-full text-muted-foreground"
+              onClick={() => setShowDetailsModal(true)}
+            >
+              <Info className="w-3.5 h-3.5 mr-1" /> View Apollo Details
+            </Button>
+          )}
+        </div>
+      )}
 
-      {/* Row 3: Add to list CTA */}
-      <Button
-        size="sm"
-        variant={inList ? 'default' : 'outline'}
-        className={`w-full h-8 text-xs gap-1.5 ${
-          inList
-            ? 'bg-primary text-primary-foreground'
-            : hasEmail
-            ? ''
-            : 'opacity-40 cursor-not-allowed'
-        }`}
-        onClick={handleToggleList}
-        disabled={!hasEmail}
-      >
-        {inList ? (
-          <><CheckCircle2 className="w-3.5 h-3.5" />In send list</>
-        ) : hasEmail ? (
-          <><Plus className="w-3.5 h-3.5" />Add to send list</>
-        ) : (
-          <><EyeOff className="w-3.5 h-3.5" />Reveal email first</>
-        )}
-      </Button>
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Apollo Profile Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-muted p-4 rounded-md overflow-auto max-h-[50vh] text-xs">
+              <pre>{JSON.stringify(apolloDetails, null, 2)}</pre>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 
-export function ProspectsGrid({ prospects }: ProspectsGridProps) {
-  const emailList = useStore(state => state.emailList);
-
+export function ProspectsGrid({ prospects }: { prospects: Prospect[] }) {
+  const emailList = useStore(s => s.emailList);
   return (
     <div className="p-4 md:p-6 space-y-4">
       {emailList.length > 0 && (
@@ -277,16 +252,13 @@ export function ProspectsGrid({ prospects }: ProspectsGridProps) {
           <span className="font-medium">
             <span className="text-primary font-bold">{emailList.length}</span> in send list
           </span>
-          <a href="/app/compose" className="text-primary hover:underline text-xs font-medium flex items-center gap-1">
-            Compose emails <ExternalLink className="w-3 h-3" />
+          <a href="/app/send" className="text-primary hover:underline text-xs font-medium flex items-center gap-1">
+            Send emails <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {prospects.map(prospect => (
-          <ProspectCard key={prospect.id} prospect={prospect} />
-        ))}
+        {prospects.map(p => <ProspectCard key={p.id} prospect={p} />)}
       </div>
     </div>
   );

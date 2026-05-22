@@ -19,25 +19,53 @@ export interface FollowUpTemplate {
   body: string;
 }
 
-// ─── Cold Email Templates ────────────────────────────────────────────────────
+// ─── Outreach Templates (canonical HR & HM) ──────────────────────────────────────────────
+// Single source of truth — used by both manual-send and compose pages.
 
-export const COLD_EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: 'recruiter-intro',
-    name: 'Recruiter Introduction',
-    description: 'Friendly intro to a recruiter at a company you want to work at',
-    subject: 'Exploring opportunities at {{company}}',
-    body: `Hi {{firstName}},
+export const HR_OUTREACH_TEMPLATE: EmailTemplate = {
+  id: 'hr-outreach',
+  name: 'HR Outreach',
+  description: 'Friendly intro to a recruiter at a company you want to work at',
+  subject: 'Exploring opportunities at {{company}}',
+  body: `Hi {{firstName}},
 
 I came across {{company}} while researching companies doing interesting work in this space, and I'd love to learn more about potential opportunities on your team.
 
-I'm a [your role] with [X years] of experience in [your domain]. Most recently, I [one key achievement].
+I'm a Software Engineer with experience in full-stack development and product-driven engineering. I've built scalable systems and shipped user-facing features at a fast pace.
 
 Would you be open to a quick 15-minute chat to see if there might be a fit? I'm flexible on timing and happy to work around your schedule.
 
 Thanks for considering,
 {{senderName}}`,
-  },
+};
+
+export const HM_OUTREACH_TEMPLATE: EmailTemplate = {
+  id: 'hm-outreach',
+  name: 'Hiring Manager Outreach',
+  description: 'Direct outreach to a hiring manager about a role',
+  subject: 'Interested in joining {{company}} - Software Engineer',
+  body: `Hi {{firstName}},
+
+I noticed {{company}} is growing its engineering team and I'd love to throw my hat in the ring.
+
+I'm a Software Engineer with a strong background in building scalable products. I enjoy working in fast-paced environments and shipping things that users love.
+
+A few highlights:
+- Built and shipped full-stack features from 0 to 1
+- Strong in TypeScript, React, Next.js, and backend APIs
+- Passionate about clean code and great user experiences
+
+I believe I could contribute meaningfully to {{company}}'s mission. Would you have 15 minutes for a quick call?
+
+Best,
+{{senderName}}`,
+};
+
+// ─── Cold Email Templates (compose page) ───────────────────────────────────────────
+// Includes the canonical HR & HM templates so compose and manual-send stay in sync.
+
+const COLD_EMAIL_TEMPLATES: EmailTemplate[] = [
+  HR_OUTREACH_TEMPLATE,
   {
     id: 'referral-ask',
     name: 'Referral / Network Ask',
@@ -45,7 +73,7 @@ Thanks for considering,
     subject: 'Quick question about {{company}}',
     body: `Hi {{firstName}},
 
-Hope you're having a great week! I've been following {{company}}'s work and I'm really impressed by [specific thing about company].
+Hope you're having a great week! I've been following {{company}}'s work and I'm really impressed by what you're building.
 
 I'm currently exploring my next move and {{company}} is high on my list. Would you be open to a quick chat about what it's like to work there, and whether there might be a fit for someone with my background?
 
@@ -54,26 +82,9 @@ I know your time is valuable — even 10 minutes would be incredibly helpful.
 Best,
 {{senderName}}`,
   },
-  {
-    id: 'direct-application',
-    name: 'Direct Application',
-    description: 'Reaching out directly about a specific role or team',
-    subject: 'Interested in joining {{company}}',
-    body: `Hi {{firstName}},
-
-I noticed {{company}} is growing its team and I'd love to throw my hat in the ring. I'm a [role] with experience in [domain] — [one-sentence pitch about your background].
-
-A few highlights:
-- [Achievement 1]
-- [Achievement 2]
-- [Achievement 3]
-
-I believe I could contribute meaningfully to {{company}}'s mission. Would you have 15 minutes for a quick call?
-
-Best,
-{{senderName}}`,
-  },
+  HM_OUTREACH_TEMPLATE,
 ];
+
 
 // ─── Follow-up Templates ─────────────────────────────────────────────────────
 
@@ -133,7 +144,7 @@ export function applyTemplate(
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
 }
 
-export function getTemplateVariables(template: string): string[] {
+function getTemplateVariables(template: string): string[] {
   const matches = template.matchAll(/\{\{(\w+)\}\}/g);
   return [...new Set(Array.from(matches).map(m => m[1]))];
 }

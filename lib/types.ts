@@ -19,13 +19,13 @@ export interface Prospect {
   notes?: string;
 }
 
-export interface SearchQuery {
+interface SearchQuery {
   websiteUrl: string;
   personTitles?: string[];
   limit?: number;
 }
 
-export interface EmailTemplate {
+interface EmailTemplate {
   id: string;
   subject: string;
   body: string;
@@ -33,7 +33,7 @@ export interface EmailTemplate {
   tone: 'professional' | 'friendly' | 'casual';
 }
 
-export interface GeneratedEmail {
+interface GeneratedEmail {
   prospectId: string;
   prospectName: string;
   prospectEmail: string;
@@ -43,13 +43,13 @@ export interface GeneratedEmail {
   status: 'draft' | 'pending' | 'sent' | 'bounced';
 }
 
-export interface AIProviderConfig {
+interface AIProviderConfig {
   name: 'openai' | 'google';
   apiKey?: string;
   modelId: string;
 }
 
-export interface GmailAuthState {
+interface GmailAuthState {
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: Date;
@@ -57,7 +57,7 @@ export interface GmailAuthState {
   userEmail?: string;
 }
 
-export interface AppSettings {
+interface AppSettings {
   apolloApiKey?: string;
   hunterApiKey?: string;
   contactOutApiKey?: string;
@@ -108,11 +108,12 @@ export interface SentEmail {
   subject: string;
   body: string;
   sentAt: Date;
-  followUpStatus: 'pending' | 'followed_up' | 'replied' | 'not_interested';
+  followUpStatus: 'pending' | 'followed_up' | 'replied' | 'replied_positive' | 'replied_negative' | 'not_interested';
   followUpCount: number;
   lastFollowUpAt?: Date;
   notes?: string;
   gmailThreadId?: string;
+  recipientType?: 'HR' | 'HM';
 }
 
 // Email list for bulk sending — prospects whose emails have been revealed
@@ -123,4 +124,5 @@ export interface EmailListEntry {
   prospectCompany: string;
   prospectTitle: string;
   addedAt: Date;
+  recipientType?: 'HR' | 'HM';
 }

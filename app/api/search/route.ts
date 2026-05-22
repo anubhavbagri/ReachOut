@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       body.domain,
       apiKey,
       body.personTitles || DEFAULT_PERSON_TITLES,
-      body.perPage || 25
+      body.perPage || 100
     );
 
     return NextResponse.json({

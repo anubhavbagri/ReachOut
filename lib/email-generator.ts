@@ -6,6 +6,7 @@
 
 import { generateText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { applyTemplate, HR_OUTREACH_TEMPLATE } from '@/lib/email-templates';
 
 export type EmailTone = 'professional' | 'friendly' | 'casual';
 
@@ -44,8 +45,9 @@ function getGeminiModel(apiKey?: string) {
     throw new Error('Gemini API key not configured. Add it in Settings → Google Gemini API Key.');
   }
 
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite-preview-06-17';
   const google = createGoogleGenerativeAI({ apiKey: key });
-  return google('gemini-1.5-flash');
+  return google(model);
 }
 
 function parseGeminiJSON(text: string): { subject: string; body: string } {
@@ -62,17 +64,16 @@ function parseGeminiJSON(text: string): { subject: string; body: string } {
 
 function fallbackEmail(prospect: ProspectForEmail): { subject: string; body: string } {
   return {
-    subject: `Exploring opportunities at ${prospect.company}`,
-    body: `Hi ${prospect.firstName},
-
-I came across ${prospect.company} and was genuinely impressed by what you're building.
-
-I'm a [your role] with experience in [your domain], and I'd love to explore whether there's a fit.
-
-Would you have 15 minutes for a quick chat?
-
-Best,
-[Your name]`,
+    subject: applyTemplate(HR_OUTREACH_TEMPLATE.subject, {
+      firstName: prospect.firstName,
+      company: prospect.company,
+      senderName: '[Your name]',
+    }),
+    body: applyTemplate(HR_OUTREACH_TEMPLATE.body, {
+      firstName: prospect.firstName,
+      company: prospect.company,
+      senderName: '[Your name]',
+    }),
   };
 }
 
@@ -215,12 +216,5 @@ export async function generateEmailsBatch(
   return emails;
 }
 
-// ─── Template helpers ────────────────────────────────────────────────────────
-
-export function personalizeEmail(template: string, variables: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/gi, (_, key) => variables[key] ?? `{{${key}}}`);
-}
-
-export function extractTemplateVariables(template: string): string[] {
-  return [...new Set(Array.from(template.matchAll(/\{\{(\w+)\}\}/g)).map(m => m[1]))];
-}
+// personalizeEmail and extractTemplateVariables are intentionally removed.
+// Use applyTemplate() and getTemplateVariables() from @/lib/email-templates instead.

@@ -26,14 +26,16 @@ export function isValidDomain(input: string): boolean {
 
 // ─── Apollo People Search ────────────────────────────────────────────────────
 
-export interface ApolloPersonRaw {
+interface ApolloPersonRaw {
   id: string;
   first_name: string;
-  last_name: string;
-  name: string;
+  last_name?: string;              // full last name (old endpoint)
+  last_name_obfuscated?: string;   // truncated e.g. "B..." (new endpoint)
+  name?: string;
   title?: string;
   email?: string;
-  linkedin_url?: string;
+  linkedin_url?: string;           // not returned by mixed_people/api_search
+  has_email?: boolean;
   city?: string;
   state?: string;
   country?: string;
@@ -46,7 +48,7 @@ export interface ApolloPersonRaw {
   };
 }
 
-export interface ApolloSearchResponse {
+interface ApolloSearchResponse {
   people: ApolloPersonRaw[];
   contacts?: ApolloPersonRaw[];
   pagination?: {
@@ -68,25 +70,24 @@ export const DEFAULT_PERSON_TITLES = [
   'talent acquisition',
 ];
 
-// contact_email_status values — hardcoded, not shown in UI
-const CONTACT_EMAIL_STATUSES = ['verified', 'unverified', 'user managed', 'update required'];
+// removed contact_email_status to fetch all results
 
 /**
- * POST /v1/people/search — search by company domain
+ * POST /api/v1/mixed_people/api_search — search by company domain
+ * (Replaces deprecated /v1/people/search)
  * API key goes in the header as X-Api-Key
  */
 export async function apolloSearchByDomain(
   domain: string,
   apiKey: string,
   personTitles: string[] = DEFAULT_PERSON_TITLES,
-  perPage = 25
+  perPage = 100
 ): Promise<Prospect[]> {
   const response = await axios.post<ApolloSearchResponse>(
-    'https://api.apollo.io/v1/people/search',
+    'https://api.apollo.io/api/v1/mixed_people/api_search',
     {
       q_organization_domains_list: [domain],
       person_titles: personTitles,
-      contact_email_status: CONTACT_EMAIL_STATUSES,
       per_page: perPage,
       page: 1,
     },
@@ -101,30 +102,38 @@ export async function apolloSearchByDomain(
 
   const people = response.data.people || response.data.contacts || [];
 
-  return people.map((p): Prospect => ({
-    id: p.id,
-    firstName: p.first_name,
-    lastName: p.last_name,
-    email: undefined, // revealed separately
-    company: p.organization?.name || domain,
-    title: p.title || '',
-    linkedin: p.linkedin_url,
-    website: p.organization?.website_url || `https://${domain}`,
-    location: [p.city, p.state, p.country].filter(Boolean).join(', ') || undefined,
-    industry: p.organization?.industry,
-    score: 85,
-    source: 'apollo',
-    createdAt: new Date(),
-  }));
+  return people.map((p): Prospect => {
+    const firstName = p.first_name || '';
+    const lastName = p.last_name || p.last_name_obfuscated || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    const company = p.organization?.name || domain;
+
+    return {
+      id: p.id,
+      firstName,
+      lastName,
+      email: undefined, // revealed separately
+      company,
+      title: p.title || '',
+      linkedin: undefined, // removed fake linkedin URL as requested
+      website: p.organization?.website_url || `https://${domain}`,
+      location: [p.city, p.state, p.country].filter(Boolean).join(', ') || undefined,
+      industry: p.organization?.industry,
+      score: 85,
+      source: 'apollo',
+      createdAt: new Date(),
+    };
+  });
 }
 
 // ─── Apollo People Enrichment (reveal email) ─────────────────────────────────
 
-export interface ApolloEnrichResponse {
+interface ApolloEnrichResponse {
   person: {
     id: string;
     email?: string;
     email_status?: string;
+    [key: string]: unknown; // Allow any other fields to be returned in details
   };
 }
 
@@ -135,7 +144,7 @@ export interface ApolloEnrichResponse {
 export async function apolloRevealEmail(
   prospectId: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<{ email: string | null; details: Record<string, unknown> | null }> {
   const response = await axios.post<ApolloEnrichResponse>(
     'https://api.apollo.io/v1/people/match',
     {
@@ -149,7 +158,11 @@ export async function apolloRevealEmail(
       },
     }
   );
-  return response.data?.person?.email || null;
+
+  return {
+    email: response.data.person?.email || null,
+    details: response.data.person || null
+  };
 }
 
 // ─── Hunter Email Finder ─────────────────────────────────────────────────────
@@ -158,9 +171,12 @@ export interface HunterEmailFinderResponse {
   data: {
     email: string | null;
     score: number;
-    position?: string;
+    position?: string | null;
     first_name?: string;
     last_name?: string;
+    domain?: string;
+    company?: string;
+    linkedin_url?: string | null;
     sources?: Array<{ domain: string; uri: string }>;
   };
 }
@@ -173,26 +189,46 @@ export async function hunterFindEmail(
   lastName: string,
   domain: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<HunterEmailFinderResponse['data'] | null> {
   const params = new URLSearchParams({
     domain,
     first_name: firstName,
     last_name: lastName,
     api_key: apiKey,
   });
-  const response = await axios.get<HunterEmailFinderResponse>(
-    `https://api.hunter.io/v2/email-finder?${params.toString()}`
-  );
-  return response.data?.data?.email || null;
+
+  try {
+    const response = await axios.get<HunterEmailFinderResponse>(
+      `https://api.hunter.io/v2/email-finder?${params.toString()}`
+    );
+    console.log('Hunter API Success response:', response.data);
+    return response.data?.data || null;
+  } catch (error: any) {
+    console.error(
+      'Hunter API Error Status:',
+      error.response?.status,
+      'Response:',
+      JSON.stringify(error.response?.data) || error.message
+    );
+    if (error.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 // ─── ContactOut Contact Info ─────────────────────────────────────────────────
 
-export interface ContactOutResponse {
+interface ContactOutResponse {
   profile?: {
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    company?: string;
     emails?: Array<{ email: string; type?: string }> | string[];
     work_email?: string;
     personal_email?: string;
+    [key: string]: unknown;
   };
 }
 
@@ -203,34 +239,34 @@ export interface ContactOutResponse {
 export async function contactOutFindEmail(
   linkedinUrl: string,
   apiKey: string
-): Promise<string | null> {
+): Promise<{ email: string | null; profile: Record<string, unknown> | null }> {
   // Normalize LinkedIn URL
   const url = linkedinUrl.startsWith('http') ? linkedinUrl : `https://${linkedinUrl}`;
 
   const response = await axios.get<ContactOutResponse>(
-    'https://api.contactout.com/v2/contact/info',
+    'https://api.contactout.com/v1/linkedin/enrich',
     {
-      params: { linkedin: url },
+      params: { profile: url },
       headers: {
-        Authorization: `Token ${apiKey}`,
+        'token': apiKey,
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     }
   );
 
+  console.log('ContactOut API Raw Response:', JSON.stringify(response.data, null, 2));
+
   const profile = response.data?.profile;
-  if (!profile) return null;
+  if (!profile) return { email: null, profile: null };
 
-  // Prefer work email, then first email in array
-  if (profile.work_email) return profile.work_email;
-  if (profile.personal_email) return profile.personal_email;
+  let email = profile.work_email || profile.personal_email;
+  if (!email && profile.emails && profile.emails.length > 0) {
+    const first = profile.emails[0];
+    email = typeof first === 'string' ? first : (first as { email: string }).email;
+  }
 
-  const emails = profile.emails;
-  if (!emails || emails.length === 0) return null;
-
-  const first = emails[0];
-  if (typeof first === 'string') return first;
-  return (first as { email: string }).email || null;
+  return { email: email || null, profile };
 }
 
 // ─── Sanitize ────────────────────────────────────────────────────────────────
@@ -254,6 +290,6 @@ export function sanitizeProspect(prospect: Partial<Prospect>): Prospect {
   };
 }
 
-export function isValidEmail(email: string): boolean {
+function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

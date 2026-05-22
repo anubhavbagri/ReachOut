@@ -1,249 +1,261 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { FieldGroup, Field, FieldLabel } from '@/components/ui/field';
 import { GmailCallbackHandler } from '@/components/gmail-callback-handler';
+import { dbGetConfig, dbDeleteConfig } from '@/lib/supabase-db';
 import {
-  Save,
-  Key,
-  Mail,
-  RefreshCw,
-  CheckCircle2,
-  ExternalLink,
-  Timer,
+  Mail, CheckCircle2, ExternalLink, LogOut, Timer, Save,
+  Key, RefreshCw, User,
 } from 'lucide-react';
 
-export default function SettingsPage() {
-  const settings = useStore(state => state.settings);
-  const setSettings = useStore(state => state.setSettings);
-  const gmailAuth = useStore(state => state.gmailAuth);
-  const addToast = useStore(state => state.addToast);
-  const [saved, setSaved] = useState(false);
 
-  const [apolloKey, setApolloKey] = useState(settings.apolloApiKey || '');
-  const [hunterKey, setHunterKey] = useState(settings.hunterApiKey || '');
-  const [contactOutKey, setContactOutKey] = useState(settings.contactOutApiKey || '');
-  const [geminiKey, setGeminiKey] = useState(settings.googleApiKey || settings.openaiApiKey || '');
-  const [emailDelay, setEmailDelay] = useState(settings.emailDelayMs);
+export default function SettingsPage() {
+  const prefs = useStore(s => s.prefs);
+  const setPrefs = useStore(s => s.setPrefs);
+  const gmailConnected = useStore(s => s.gmailConnected);
+  const gmailUserEmail = useStore(s => s.gmailUserEmail);
+  const setGmailState = useStore(s => s.setGmailState);
+  const addToast = useStore(s => s.addToast);
+
+  const [delayMs, setDelayMs] = useState(prefs.emailDelayMs);
+  const [senderName, setSenderName] = useState(prefs.senderName || '');
+  const [saved, setSaved] = useState(false);
+  const [loadingGmail, setLoadingGmail] = useState(false);
+
+  // On mount, check Supabase for Gmail connection state
+  useEffect(() => {
+    dbGetConfig('gmail_user_email').then(email => {
+      if (email) setGmailState(email, true);
+    });
+  }, [setGmailState]);
 
   const handleSave = () => {
-    setSettings({
-      apolloApiKey: apolloKey,
-      hunterApiKey: hunterKey,
-      contactOutApiKey: contactOutKey,
-      googleApiKey: geminiKey,
-      emailDelayMs: emailDelay,
-    });
+    setPrefs({ emailDelayMs: delayMs, senderName });
     setSaved(true);
-    addToast('Settings saved', 'success');
-    setTimeout(() => setSaved(false), 3000);
+    addToast('Preferences saved', 'success');
+    setTimeout(() => setSaved(false), 2500);
   };
 
   const handleConnectGmail = () => {
+    setLoadingGmail(true);
     window.location.href = '/api/auth/gmail';
+  };
+
+  const handleDisconnectGmail = async () => {
+    await dbDeleteConfig('gmail_refresh_token');
+    await dbDeleteConfig('gmail_user_email');
+    setGmailState('', false);
+    addToast('Gmail disconnected', 'info');
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Handle Gmail OAuth callback */}
-      <Suspense fallback={null}>
-        <GmailCallbackHandler />
-      </Suspense>
+      <Suspense fallback={null}><GmailCallbackHandler /></Suspense>
 
-      <div className="border-b border-border bg-card/50 p-4 md:p-6">
+      {/* Header */}
+      <div className="border-b border-border bg-card/50 px-4 py-4 md:px-6 md:py-5 shrink-0">
         <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Configure API keys and integrations
-        </p>
+        <p className="text-muted-foreground text-sm mt-0.5">Gmail connection and send preferences</p>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6 max-w-3xl w-full">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="max-w-2xl mx-auto space-y-4">
 
-        {/* Gmail Integration — most important, so first */}
-        <Card className="p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <Mail className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold">Gmail Integration</h2>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <div className="space-y-0.5">
-              <h3 className="font-medium">Gmail Account</h3>
-              <p className="text-sm text-muted-foreground">
-                {gmailAuth.isAuthenticated
-                  ? (
-                    <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      {gmailAuth.userEmail}
-                    </span>
-                  )
-                  : 'Not connected'}
-              </p>
+          {/* ── Gmail Account ─────────────────────────────────────── */}
+          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+            {/* Section header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Mail className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Gmail Account</h2>
+                <p className="text-xs text-muted-foreground">Used to send all outreach emails</p>
+              </div>
             </div>
-            <Button variant={gmailAuth.isAuthenticated ? 'outline' : 'default'} onClick={handleConnectGmail} className="gap-2">
-              {gmailAuth.isAuthenticated ? (
-                <>
-                  <RefreshCw className="w-4 h-4" />
-                  Switch Account
-                </>
+
+            <div className="p-5 space-y-4">
+              {gmailConnected ? (
+                <div className="space-y-3">
+                  {/* Connected badge */}
+                  <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{ background: 'oklch(0.96 0.04 160)', border: '1px solid oklch(0.85 0.08 155)' }}>
+                    <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'oklch(0.50 0.14 155)' }} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: 'oklch(0.35 0.12 155)' }}>Connected</p>
+                      <p className="text-xs truncate" style={{ color: 'oklch(0.50 0.1 155)' }}>{gmailUserEmail}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleDisconnectGmail}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-border hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Disconnect Gmail
+                  </button>
+                </div>
               ) : (
-                <>
-                  <Mail className="w-4 h-4" />
-                  Connect Gmail
-                </>
+                <div className="space-y-4">
+                  {/* Info box */}
+                  <div className="rounded-xl p-4 space-y-1"
+                    style={{ background: 'oklch(0.96 0.015 65)', border: '1px solid oklch(0.88 0.025 60)' }}>
+                    <p className="text-sm font-medium">One-time setup</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Connects your personal Gmail via OAuth. The refresh token is stored securely in Supabase — no re-auth needed on new devices.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleConnectGmail}
+                      disabled={loadingGmail}
+                      className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold clay-shadow transition-all disabled:opacity-60"
+                      style={{ background: 'oklch(0.58 0.2 25)', color: 'oklch(0.98 0.01 70)' }}
+                    >
+                      {loadingGmail
+                        ? <><RefreshCw className="w-4 h-4 animate-spin" /> Redirecting…</>
+                        : <><Mail className="w-4 h-4" /> Connect Gmail</>
+                      }
+                    </button>
+
+                    <a
+                      href="https://console.cloud.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium border border-border hover:bg-muted transition-colors text-muted-foreground"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Google Cloud Console
+                    </a>
+                  </div>
+                </div>
               )}
-            </Button>
-          </div>
+            </div>
+          </section>
 
-          {!gmailAuth.isAuthenticated && (
-            <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
-              <p className="font-medium text-blue-800 dark:text-blue-300">Setup required (one-time):</p>
-              <ol className="list-decimal list-inside space-y-1.5 text-blue-700 dark:text-blue-400">
-                <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5">Google Cloud Console <ExternalLink className="w-3 h-3" /></a> → create a project</li>
-                <li>Enable <strong>Gmail API</strong> for the project</li>
-                <li>Create OAuth 2.0 credentials (Web app type)</li>
-                <li>Add <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">{typeof window !== 'undefined' ? window.location.origin : 'https://yourapp.vercel.app'}/api/auth/gmail?action=callback</code> as redirect URI</li>
-                <li>Add <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">GOOGLE_CLIENT_ID</code> and <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">GOOGLE_CLIENT_SECRET</code> to Vercel env vars</li>
-                <li>Click <strong>Connect Gmail</strong> above to authorize</li>
-              </ol>
-              <p className="text-xs text-blue-600 dark:text-blue-500 mt-2">
-                ✓ Emails will be sent directly from your personal Gmail account — no third-party servers involved.
+          {/* ── Send Preferences ───────────────────────────────────── */}
+          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+              <div className="w-9 h-9 rounded-xl bg-secondary/15 flex items-center justify-center shrink-0">
+                <Timer className="w-4 h-4 text-secondary" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Send Preferences</h2>
+                <p className="text-xs text-muted-foreground">Personalization and rate limiting</p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Sender name */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  Your name (used in email templates)
+                </label>
+                <Input
+                  placeholder="e.g. Anubhav Bagri"
+                  value={senderName}
+                  onChange={e => setSenderName(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+
+              {/* Delay */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Timer className="w-3.5 h-3.5 text-muted-foreground" />
+                  Delay between bulk emails (ms)
+                </label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={500}
+                    max={30000}
+                    step={500}
+                    value={delayMs}
+                    onChange={e => setDelayMs(parseInt(e.target.value))}
+                    className="h-10 w-28 tabular-nums"
+                  />
+                  <div className="flex gap-2">
+                    {[1000, 1500, 2000, 3000].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setDelayMs(v)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                          delayMs === v
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {v}ms
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Minimum 1000ms recommended to avoid Gmail rate limits</p>
+              </div>
+
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold clay-shadow transition-all"
+                style={saved
+                  ? { background: 'oklch(0.68 0.08 160)', color: 'oklch(0.98 0.01 70)' }
+                  : { background: 'oklch(0.58 0.2 25)', color: 'oklch(0.98 0.01 70)' }
+                }
+              >
+                {saved
+                  ? <><CheckCircle2 className="w-4 h-4" /> Saved!</>
+                  : <><Save className="w-4 h-4" /> Save Preferences</>
+                }
+              </button>
+            </div>
+          </section>
+
+          {/* ── API Keys info ──────────────────────────────────────── */}
+          <section className="rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-4 flex gap-3">
+            <Key className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="space-y-1 min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">API Keys are configured as environment variables</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Apollo, Hunter, ContactOut, Gemini, and Google OAuth keys are set in Vercel → Settings → Environment Variables. See{' '}
+                <code className="bg-muted px-1 py-0.5 rounded text-[11px]">.env.example</code>{' '}
+                for the full list.
               </p>
             </div>
-          )}
-        </Card>
+          </section>
 
-        {/* Prospect API Keys */}
-        <Card className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-primary" />
-            <div>
-              <h2 className="text-xl font-bold">Prospect API Keys</h2>
-              <p className="text-sm text-muted-foreground">Used to find recruiters and reveal email addresses</p>
+          {/* ── Logout ────────────────────────────────────────────── */}
+          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+              <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                <LogOut className="w-4 h-4 text-destructive" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Session</h2>
+                <p className="text-xs text-muted-foreground">You are logged in to ReachOut</p>
+              </div>
             </div>
-          </div>
-
-          <FieldGroup>
-            <Field>
-              <FieldLabel>Apollo.io API Key <span className="text-destructive">*</span></FieldLabel>
-              <Input
-                type="password"
-                placeholder="api_key_..."
-                value={apolloKey}
-                onChange={e => setApolloKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Required for prospect search. Get from{' '}
-                <a href="https://app.apollo.io/#/settings/integrations/api" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                  Apollo Settings → API <ExternalLink className="w-3 h-3" />
-                </a>
-              </p>
-            </Field>
-
-            <Field>
-              <FieldLabel>
-                Hunter.io API Key{' '}
-                <span className="text-xs text-muted-foreground font-normal">(optional fallback)</span>
-              </FieldLabel>
-              <Input
-                type="password"
-                placeholder="hnt_..."
-                value={hunterKey}
-                onChange={e => setHunterKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Shows a separate "Find Email (Hunter)" button on each prospect card.{' '}
-                <a href="https://hunter.io/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                  Get key <ExternalLink className="w-3 h-3" />
-                </a>
-              </p>
-            </Field>
-
-            <Field>
-              <FieldLabel>
-                ContactOut API Key{' '}
-                <span className="text-xs text-muted-foreground font-normal">(optional fallback)</span>
-              </FieldLabel>
-              <Input
-                type="password"
-                placeholder="co_..."
-                value={contactOutKey}
-                onChange={e => setContactOutKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Shows a separate "Find Email (ContactOut)" button on each prospect card (requires LinkedIn URL).{' '}
-                <a href="https://contactout.com/api" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                  Get key <ExternalLink className="w-3 h-3" />
-                </a>
-              </p>
-            </Field>
-          </FieldGroup>
-        </Card>
-
-        {/* AI Keys */}
-        <Card className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-accent" />
-            <div>
-              <h2 className="text-xl font-bold">AI Email Generation (Gemini)</h2>
-              <p className="text-sm text-muted-foreground">Used by Manual Send and Compose to write personalized emails</p>
+            <div className="p-5">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border transition-colors hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive"
+              >
+                <LogOut className="w-4 h-4" />
+                Log out
+              </button>
             </div>
-          </div>
+          </section>
 
-          <FieldGroup>
-            <Field>
-              <FieldLabel>Google Gemini API Key <span className="text-destructive">*</span></FieldLabel>
-              <Input
-                type="password"
-                placeholder="AIza..."
-                value={geminiKey}
-                onChange={e => setGeminiKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Used for AI email generation (Manual Send and Compose modes).{' '}
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                  Get from Google AI Studio <ExternalLink className="w-3 h-3" />
-                </a>
-              </p>
-            </Field>
-          </FieldGroup>
-        </Card>
-
-        {/* Email Preferences */}
-        <Card className="p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Timer className="w-5 h-5 text-secondary" />
-            <div>
-              <h2 className="text-xl font-bold">Send Preferences</h2>
-              <p className="text-sm text-muted-foreground">Rate limiting for bulk sends</p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <div>
-              <h3 className="font-medium">Delay Between Emails</h3>
-              <p className="text-sm text-muted-foreground">Milliseconds to wait between each email send</p>
-            </div>
-            <Input
-              type="number"
-              min={500}
-              max={30000}
-              step={500}
-              value={emailDelay}
-              onChange={e => setEmailDelay(parseInt(e.target.value))}
-              className="w-28"
-            />
-          </div>
-        </Card>
-
-        <Button onClick={handleSave} className="gap-2 w-full sm:w-auto">
-          <Save className="w-4 h-4" />
-          {saved ? 'Saved!' : 'Save Settings'}
-        </Button>
+        </div>
       </div>
     </div>
   );

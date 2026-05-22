@@ -24,6 +24,7 @@ interface Email {
   prospectTitle: string;
   subject: string;
   body: string;
+  recipientType?: 'HR' | 'HM';
 }
 
 interface EmailBulkSenderProps {
@@ -43,14 +44,15 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<SendResult[]>([]);
-  const [delayMs, setDelayMs] = useState(1500);
+  const [delayMs, setDelayMs] = useState(500);
 
-  const addToast = useStore(state => state.addToast);
-  const gmailAuth = useStore(state => state.gmailAuth);
-  const settings = useStore(state => state.settings);
-  const addSentEmail = useStore(state => state.addSentEmail);
+  const addToast = useStore(s => s.addToast);
+  const gmailConnected = useStore(s => s.gmailConnected);
+  const gmailUserEmail = useStore(s => s.gmailUserEmail);
+  const gmailSenderName = useStore(s => s.gmailUserEmail); // used as display name fallback
+  const addSentEmailToCache = useStore(s => s.addSentEmailToCache);
 
-  const isGmailConnected = gmailAuth.isAuthenticated && gmailAuth.refreshToken;
+  const isGmailConnected = gmailConnected;
 
   const handleSend = async () => {
     if (!isGmailConnected) {
@@ -72,11 +74,11 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            refreshToken: gmailAuth.refreshToken,
             to: email.prospectEmail,
             subject: email.subject,
             body: email.body,
-            fromEmail: gmailAuth.userEmail,
+            fromEmail: gmailUserEmail || undefined,
+            fromName: 'Anubhav Bagri',
           }),
         });
 
@@ -98,7 +100,7 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           threadId: data.threadId,
         });
 
-        // Record in follow-up tracker
+        // Persist to Supabase + update cache
         const sentRecord: SentEmail = {
           id: `sent-${Date.now()}-${i}`,
           prospectId: email.prospectId,
@@ -112,8 +114,11 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           followUpStatus: 'pending',
           followUpCount: 0,
           gmailThreadId: data.threadId,
+          recipientType: email.recipientType || 'HR',
         };
-        addSentEmail(sentRecord);
+        const { dbInsertSentEmail } = await import('@/lib/supabase-db');
+        await dbInsertSentEmail(sentRecord);
+        addSentEmailToCache(sentRecord);
 
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -139,6 +144,11 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
         : `${sent} emails sent successfully!`,
       failed > 0 ? 'warning' : 'success'
     );
+    // Clear build/review state so the form resets for next batch
+    try {
+      sessionStorage.removeItem('reachout_manual_form_state');
+      sessionStorage.removeItem('reachout_manual_page_state');
+    } catch { /* ignore */ }
     onComplete?.();
   };
 
@@ -181,7 +191,7 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
       {isGmailConnected && (
         <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
           <CheckCircle2 className="w-4 h-4" />
-          Sending as <strong>{gmailAuth.userEmail}</strong>
+          Sending as <strong>{gmailUserEmail}</strong>
         </div>
       )}
 
@@ -196,8 +206,8 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
                 min={500}
                 max={30000}
                 step={500}
-                value={delayMs}
-                onChange={e => setDelayMs(parseInt(e.target.value))}
+                value={delayMs || ''}
+                onChange={e => setDelayMs(parseInt(e.target.value) || 500)}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {emails.length} emails ≈ {Math.ceil((delayMs * (emails.length - 1)) / 1000)}s total. Minimum 500ms recommended.
@@ -208,7 +218,7 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           <div className="bg-muted/30 p-4 rounded-lg space-y-2">
             <p className="text-sm font-medium">Before you send:</p>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>✓ Emails will be sent from your personal Gmail ({gmailAuth.userEmail || 'not connected'})</li>
+              <li>✓ Emails will be sent from your personal Gmail ({gmailUserEmail || 'not connected'})</li>
               <li>✓ Each email will be tracked in Follow-ups automatically</li>
               <li>✓ All {emails.length} prospects have valid email addresses</li>
               <li>✓ You can check replies directly in Gmail</li>
