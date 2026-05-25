@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS sent_emails (
   id                TEXT PRIMARY KEY,               -- e.g. "sent-1715000000000-0"
   prospect_id       TEXT NOT NULL,
   prospect_name     TEXT NOT NULL,
-  prospect_email    TEXT NOT NULL,
+  prospect_email    TEXT NOT NULL UNIQUE,
   prospect_company  TEXT DEFAULT '',
   prospect_title    TEXT DEFAULT '',
   subject           TEXT NOT NULL,

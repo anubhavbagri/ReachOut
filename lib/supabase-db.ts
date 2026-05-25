@@ -38,7 +38,9 @@ export async function dbGetSentEmails(): Promise<SentEmail[]> {
 
 export async function dbInsertSentEmail(email: SentEmail): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from('sent_emails').insert(sentEmailToRow(email));
+  const { error } = await supabase
+    .from('sent_emails')
+    .upsert(sentEmailToRow(email), { onConflict: 'prospect_email' });
   if (error) console.error('[DB] insertSentEmail:', error);
 }
 
