@@ -26,65 +26,66 @@ export const HR_OUTREACH_TEMPLATE: EmailTemplate = {
   id: 'hr-outreach',
   name: 'HR Outreach',
   description: 'Friendly intro to a recruiter at a company you want to work at',
-  subject: 'Exploring opportunities at {{company}}',
+  subject: 'Excited to contribute to software @ {{Company}} | SDE1 ~3YOE',
   body: `Hi {{firstName}},
 
-I came across {{company}} while researching companies doing interesting work in this space, and I'd love to learn more about potential opportunities on your team.
+Hope you're doing well.
 
-I'm a Software Engineer with experience in full-stack development and product-driven engineering. I've built scalable systems and shipped user-facing features at a fast pace.
+I'm reaching out to explore **Software Engineer** opportunities at **{{Company}}**. I've a strong foundation in **Java**, industry experience working with **Azure** and have built **event-driven systems** using Kafka and Spring Boot for high-scale async workflows and enterprise finance use cases. Additionally, I have solved **650+ problems on Leetcode**, on my journey to improve problem-solving & DSA.
 
-Would you be open to a quick 15-minute chat to see if there might be a fit? I'm flexible on timing and happy to work around your schedule.
+Will keep it brief to respect your time:
 
-Thanks for considering,
-{{senderName}}`,
+• Current role: Associate Software Engineer
+• Experience: 3 years
+• Technical Skillset: Java, Springboot, Microservices, Kafka, React, SQL DB, Docker, CI/CD (Azure, GitHub Actions)
+• Current Employer: Shell
+• Current Location: Bangalore
+• Notice Period: 60 days
+• Open to Relocation: Yes (Bangalore, Hyderabad, Gurgaon, Pune)
+
+So, I would love to hear if there are any suitable openings at {{Company}} that align with my experience and skills.
+
+PFA, my latest resume: [https://anubhavbagri.com/resume](https://anubhavbagri.com/resume)
+
+Thanks for your time and attention!
+
+Best Regards,
+
+{{senderName}}
++91-8910145846
+[Portfolio](https://anubhavbagri.com) | [LinkedIn](https://www.linkedin.com/in/anubhavbagri/) | [Leetcode](https://leetcode.com/anubhavbagri01)`,
 };
 
 export const HM_OUTREACH_TEMPLATE: EmailTemplate = {
   id: 'hm-outreach',
   name: 'Hiring Manager Outreach',
   description: 'Direct outreach to a hiring manager about a role',
-  subject: 'Interested in joining {{company}} - Software Engineer',
-  body: `Hi {{firstName}},
+  subject: 'Keen to contribute to software @ {{Company}} | SDE1 ~3YOE',
+  body: `Hey {{firstName}},
 
-I noticed {{company}} is growing its engineering team and I'd love to throw my hat in the ring.
+Hope you're doing well.
 
-I'm a Software Engineer with a strong background in building scalable products. I enjoy working in fast-paced environments and shipping things that users love.
+I'll keep my request short to respect your time. I'm reaching out regarding potential SDE1/SDE2 opportunities at **{{Company}}**.
 
-A few highlights:
-- Built and shipped full-stack features from 0 to 1
-- Strong in TypeScript, React, Next.js, and backend APIs
-- Passionate about clean code and great user experiences
+Key Highlights:
 
-I believe I could contribute meaningfully to {{company}}'s mission. Would you have 15 minutes for a quick call?
+• Built **event-driven systems** using Kafka and Spring Boot for high-scale async workflows and enterprise finance use cases
+• Strengthened **CI/CD + cloud infra (Docker, Terraform, Azure)**, improving reliability and reducing deployment overhead
+• Led **AI-assisted engineering efforts at Shell**: automated code generation + workflow pipelines, reducing manual effort ~20%
+• Built products like [CrowdLens](https://crowdlens.anubhavbagri.com/), along with MCPs & AI agents for outreach, job automation, and developer tooling
+• Strong foundation in **Java** and have solved **650+** problems on [Leetcode](https://leetcode.com/anubhavbagri01), on my journey to improve problem-solving & DSA
+• Also built **mobile + frontend apps (Flutter, React)**, so I think across product, not just backend
 
-Best,
-{{senderName}}`,
+In case you don't believe me: [https://anubhavbagri.com](https://anubhavbagri.com)
+
+I would really appreciate it if you could consider my application for any openings in your team at {{Company}}.
+
+Thanks & Regards,
+
+{{senderName}}
++91-8910145846
+[LinkedIn](https://www.linkedin.com/in/anubhavbagri/) | [Github](https://github.com/anubhavbagri) | [Resume](https://anubhavbagri.com/resume)`,
 };
-
-// ─── Cold Email Templates (compose page) ───────────────────────────────────────────
-// Includes the canonical HR & HM templates so compose and manual-send stay in sync.
-
-const COLD_EMAIL_TEMPLATES: EmailTemplate[] = [
-  HR_OUTREACH_TEMPLATE,
-  {
-    id: 'referral-ask',
-    name: 'Referral / Network Ask',
-    description: 'Asking for a referral or warm intro to the team',
-    subject: 'Quick question about {{company}}',
-    body: `Hi {{firstName}},
-
-Hope you're having a great week! I've been following {{company}}'s work and I'm really impressed by what you're building.
-
-I'm currently exploring my next move and {{company}} is high on my list. Would you be open to a quick chat about what it's like to work there, and whether there might be a fit for someone with my background?
-
-I know your time is valuable — even 10 minutes would be incredibly helpful.
-
-Best,
-{{senderName}}`,
-  },
-  HM_OUTREACH_TEMPLATE,
-];
-
 
 // ─── Follow-up Templates ─────────────────────────────────────────────────────
 
@@ -96,10 +97,11 @@ export const FOLLOWUP_TEMPLATES: FollowUpTemplate[] = [
     subject: 'Re: {{originalSubject}}',
     body: `Hi {{firstName}},
 
-Just wanted to bump this up in case it got buried. I'd still love to connect and learn more about {{company}}.
+Just trying to follow up on my previous email: Did you get a chance to look at my application?
 
-Happy to work around your schedule — even a quick 10-minute intro call would be great.
+I'm targeting SDE1/SDE2 roles and am also available for any in-person interviews in Bangalore.
 
+Thanks & Regards,
 {{senderName}}`,
   },
   {
@@ -109,9 +111,7 @@ Happy to work around your schedule — even a quick 10-minute intro call would b
     subject: 'Re: {{originalSubject}}',
     body: `Hi {{firstName}},
 
-I know inboxes get hectic — just one last nudge before I leave you alone! 😊
-
-I'm genuinely excited about what {{company}} is building and would love to find out if there's a fit. If timing isn't right, no worries at all — I appreciate you taking a look.
+Checking in to see if you got the opportunity to see my last email. I've a knack for writing object-oriented code and I think I'd be a great fit for any SDE1 openings at {{Company}}.
 
 Best,
 {{senderName}}`,
@@ -123,11 +123,12 @@ Best,
     subject: 'Closing the loop — {{company}}',
     body: `Hi {{firstName}},
 
-I'll keep this short — I've reached out a couple of times about opportunities at {{company}} but haven't heard back, so I assume the timing isn't right.
+The industry standard of follow-ups is approximately 7 times, and this is my 3rd one. But I know how annoying it can get so I don't want to overstep.
 
-I'll stop following up after this, but if things change or a relevant role opens up, I'd genuinely love to reconnect. I'll be rooting for {{company}} either way!
+Do let me know whether or not I should keep following up!
 
-All the best,
+Thank you!
+
 {{senderName}}`,
   },
 ];
@@ -141,7 +142,10 @@ export function applyTemplate(
   template: string,
   variables: Record<string, string>
 ): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+  const lower = Object.fromEntries(
+    Object.entries(variables).map(([k, v]) => [k.toLowerCase(), v])
+  );
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => lower[key.toLowerCase()] ?? `{{${key}}}`);
 }
 
 function getTemplateVariables(template: string): string[] {

@@ -7,7 +7,7 @@ import { GmailCallbackHandler } from '@/components/gmail-callback-handler';
 import { dbGetConfig, dbDeleteConfig } from '@/lib/supabase-db';
 import {
   Mail, CheckCircle2, ExternalLink, LogOut, Timer, Save,
-  Key, RefreshCw, User,
+  Key, RefreshCw, User, FileText, Link as LinkIcon,
 } from 'lucide-react';
 
 
@@ -21,6 +21,10 @@ export default function SettingsPage() {
 
   const [delayMs, setDelayMs] = useState(prefs.emailDelayMs);
   const [senderName, setSenderName] = useState(prefs.senderName || '');
+  const [linkedinUrl, setLinkedinUrl] = useState(prefs.linkedinUrl || '');
+  const [githubUrl, setGithubUrl] = useState(prefs.githubUrl || '');
+  const [portfolioUrl, setPortfolioUrl] = useState(prefs.portfolioUrl || '');
+  const [resumeUrl, setResumeUrl] = useState(prefs.resumeUrl || '');
   const [saved, setSaved] = useState(false);
   const [loadingGmail, setLoadingGmail] = useState(false);
 
@@ -32,7 +36,14 @@ export default function SettingsPage() {
   }, [setGmailState]);
 
   const handleSave = () => {
-    setPrefs({ emailDelayMs: delayMs, senderName });
+    setPrefs({
+      emailDelayMs: delayMs,
+      senderName,
+      linkedinUrl,
+      githubUrl,
+      portfolioUrl,
+      resumeUrl,
+    });
     setSaved(true);
     addToast('Preferences saved', 'success');
     setTimeout(() => setSaved(false), 2500);
@@ -202,6 +213,101 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">Minimum 1000ms recommended to avoid Gmail rate limits</p>
+              </div>
+
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold clay-shadow transition-all"
+                style={saved
+                  ? { background: 'oklch(0.68 0.08 160)', color: 'oklch(0.98 0.01 70)' }
+                  : { background: 'oklch(0.58 0.2 25)', color: 'oklch(0.98 0.01 70)' }
+                }
+              >
+                {saved
+                  ? <><CheckCircle2 className="w-4 h-4" /> Saved!</>
+                  : <><Save className="w-4 h-4" /> Save Preferences</>
+                }
+              </button>
+            </div>
+          </section>
+
+          {/* ── Profile & Resume ─────────────────────────────────────── */}
+          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 text-purple-500" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Profile & Resume</h2>
+                <p className="text-xs text-muted-foreground">Links substituted into outreach templates</p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Codebase resume info */}
+              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-500/5">
+                <FileText className="w-4 h-4 text-purple-500 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium text-purple-800 dark:text-purple-300">Resume stored in codebase</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Place your PDF as <code className="bg-muted px-1 py-0.5 rounded text-[10px]">public/resume.pdf</code> in the project root. It will be attached automatically when sending to Hiring Managers — works across all sessions and browsers.
+                  </p>
+                </div>
+              </div>
+
+              {/* Profile links grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    LinkedIn URL
+                  </label>
+                  <Input
+                    placeholder="https://linkedin.com/in/username"
+                    value={linkedinUrl}
+                    onChange={e => setLinkedinUrl(e.target.value)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    GitHub URL
+                  </label>
+                  <Input
+                    placeholder="https://github.com/username"
+                    value={githubUrl}
+                    onChange={e => setGithubUrl(e.target.value)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    Portfolio/Website URL
+                  </label>
+                  <Input
+                    placeholder="https://yourportfolio.com"
+                    value={portfolioUrl}
+                    onChange={e => setPortfolioUrl(e.target.value)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    Resume Link (Google Drive / Notion)
+                  </label>
+                  <Input
+                    placeholder="https://drive.google.com/..."
+                    value={resumeUrl}
+                    onChange={e => setResumeUrl(e.target.value)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                </div>
               </div>
 
               <button

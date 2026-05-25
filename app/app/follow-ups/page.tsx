@@ -55,7 +55,9 @@ const STATUS_CONFIG = {
 
 function formatDate(date: Date | string) {
   const d = new Date(date);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${timeStr}, ${dateStr}`;
 }
 
 type Tab = 'pending' | 'follow-up-1' | 'follow-up-2' | 'follow-up-3' | 'replied' | 'not_interested';
@@ -428,7 +430,7 @@ export default function FollowUpsPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-muted-foreground">
-                        {formatDate(email.sentAt)}
+                        {formatDate(email.lastFollowUpAt || email.sentAt)}
                         {needsAction && <span className="text-yellow-600 dark:text-yellow-400 font-medium ml-1">⚡ Due</span>}
                       </span>
                       <div className="flex items-center gap-0.5">
@@ -516,7 +518,7 @@ export default function FollowUpsPage() {
                           <span className="truncate block max-w-[200px] text-muted-foreground">{email.subject}</span>
                         </td>
                         <td className="py-3 px-3 whitespace-nowrap">
-                          <span className="text-xs text-muted-foreground">{formatDate(email.sentAt)}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(email.lastFollowUpAt || email.sentAt)}</span>
                           {needsAction && (
                             <span className="block text-[10px] text-yellow-600 dark:text-yellow-400 font-medium">⚡ Due</span>
                           )}

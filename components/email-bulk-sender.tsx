@@ -41,10 +41,12 @@ interface SendResult {
 }
 
 export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
+  const prefs = useStore(s => s.prefs);
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<SendResult[]>([]);
-  const [delayMs, setDelayMs] = useState(500);
+  const [delayMs, setDelayMs] = useState(300);
+  const [attachResume, setAttachResume] = useState(true);
 
   const addToast = useStore(s => s.addToast);
   const gmailConnected = useStore(s => s.gmailConnected);
@@ -70,16 +72,23 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
       const email = emails[i];
 
       try {
+        const payload: Record<string, unknown> = {
+          to: email.prospectEmail,
+          subject: email.subject,
+          body: email.body,
+          fromEmail: gmailUserEmail || undefined,
+          fromName: 'Anubhav Bagri',
+        };
+
+        // Server reads resume.pdf from public/ — no base64 over the wire
+        if (attachResume) {
+          payload.attachResume = true;
+        }
+
         const res = await fetch('/api/mcp/gmail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: email.prospectEmail,
-            subject: email.subject,
-            body: email.body,
-            fromEmail: gmailUserEmail || undefined,
-            fromName: 'Anubhav Bagri',
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json() as {
@@ -87,10 +96,12 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
           messageId?: string;
           threadId?: string;
           error?: string;
+          details?: string;
         };
 
         if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Send failed');
+          console.error('[ReachOut] Server error details:', data.details || data.error);
+          throw new Error(data.details || data.error || 'Send failed');
         }
 
         newResults.push({
@@ -124,6 +135,8 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error';
         console.error(`[ReachOut] Failed to send to ${email.prospectEmail}:`, errMsg);
         newResults.push({ email: email.prospectEmail, success: false, error: errMsg });
+        // Show the real error immediately so you can diagnose
+        addToast(`Send failed: ${errMsg}`, 'error');
       }
 
       setResults([...newResults]);
@@ -195,22 +208,47 @@ export function EmailBulkSender({ emails, onComplete }: EmailBulkSenderProps) {
         </div>
       )}
 
-      {/* Settings */}
       {!sending && results.length === 0 && (
         <Card className="p-6 space-y-6">
+          {/* Resume Option — reads Anubhav_Bagri_Resume.pdf from public/ on the server */}
+          <div className="flex items-start gap-3 p-3.5 rounded-xl border border-border bg-purple-500/5 dark:bg-purple-950/10">
+            <input
+              type="checkbox"
+              id="attach-resume-checkbox"
+              checked={attachResume}
+              onChange={e => setAttachResume(e.target.checked)}
+              className="mt-1 w-4 h-4 accent-purple-500 cursor-pointer"
+            />
+            <label htmlFor="attach-resume-checkbox" className="text-xs sm:text-sm font-medium cursor-pointer flex-1">
+              Attach resume to Hiring Manager emails
+              <span className="block text-[10px] text-muted-foreground mt-0.5 font-normal">
+                Anubhav_Bagri_Resume.pdf — served directly from the codebase
+              </span>
+            </label>
+          </div>
+
+
           <FieldGroup>
             <Field>
               <FieldLabel>Delay Between Emails (ms)</FieldLabel>
               <Input
                 type="number"
-                min={500}
+                min={0}
                 max={30000}
-                step={500}
+                step={100}
                 value={delayMs || ''}
-                onChange={e => setDelayMs(parseInt(e.target.value) || 500)}
+                onChange={e => setDelayMs(Math.max(0, parseInt(e.target.value) || 0))}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {emails.length} emails ≈ {Math.ceil((delayMs * (emails.length - 1)) / 1000)}s total. Minimum 500ms recommended.
+                {emails.length} emails ≈{' '}
+                <strong>{Math.ceil(((delayMs + 800) * emails.length) / 1000)}s</strong>
+                {' '}total (~800ms send time + {delayMs}ms delay each).
+                {delayMs < 200 && delayMs > 0 && (
+                  <span className="text-amber-500 font-medium"> ⚠ Below 200ms risks Gmail rate-limits (429).</span>
+                )}
+                {delayMs === 0 && (
+                  <span className="text-red-500 font-medium"> ⚠ No delay — likely to hit Gmail rate-limits mid-batch.</span>
+                )}
               </p>
             </Field>
           </FieldGroup>

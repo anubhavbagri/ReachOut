@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { dbGetRevealedProspects, RevealedProspect } from '@/lib/supabase-db';
-import { Mail, Clock, ExternalLink, Send, Download } from 'lucide-react';
+import { Mail, Clock, ExternalLink, Send, Download, Copy, Check } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -11,9 +11,18 @@ export default function RevealedPage() {
   const [prospects, setProspects] = useState<RevealedProspect[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   const addToEmailList = useStore(state => state.addToEmailList);
   const addToast = useStore(state => state.addToast);
+
+  const handleCopyEmail = (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(email);
+    setTimeout(() => setCopiedEmail(null), 2000);
+    addToast('Email copied to clipboard', 'success');
+  };
 
   useEffect(() => {
     async function load() {
@@ -203,6 +212,17 @@ export default function RevealedPage() {
                           <div className="flex items-center gap-1.5 font-medium text-green-700 dark:text-green-400">
                             <Mail className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate max-w-[180px]">{p.email}</span>
+                            <button
+                              onClick={(e) => handleCopyEmail(e, p.email)}
+                              className="p-1 rounded text-muted-foreground hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-950/50 dark:hover:text-green-400 transition-colors"
+                              title="Copy email"
+                            >
+                              {copiedEmail === p.email ? (
+                                <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           </div>
                         </td>
                         <td className="px-4 py-3">

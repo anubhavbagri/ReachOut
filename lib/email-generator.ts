@@ -63,17 +63,14 @@ function parseGeminiJSON(text: string): { subject: string; body: string } {
 }
 
 function fallbackEmail(prospect: ProspectForEmail): { subject: string; body: string } {
+  const vars = {
+    firstName: prospect.firstName,
+    company: prospect.company,
+    senderName: '[Your name]',
+  };
   return {
-    subject: applyTemplate(HR_OUTREACH_TEMPLATE.subject, {
-      firstName: prospect.firstName,
-      company: prospect.company,
-      senderName: '[Your name]',
-    }),
-    body: applyTemplate(HR_OUTREACH_TEMPLATE.body, {
-      firstName: prospect.firstName,
-      company: prospect.company,
-      senderName: '[Your name]',
-    }),
+    subject: applyTemplate(HR_OUTREACH_TEMPLATE.subject, vars),
+    body: applyTemplate(HR_OUTREACH_TEMPLATE.body, vars),
   };
 }
 

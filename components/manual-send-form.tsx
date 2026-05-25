@@ -130,6 +130,7 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
   const addToast = useStore(s => s.addToast);
   const emailList = useStore(s => s.emailList);
   const clearEmailList = useStore(s => s.clearEmailList);
+  const prefs = useStore(s => s.prefs);
 
   // Contacts — persisted in sessionStorage
   const [contacts, setContacts] = useState<ManualContact[]>([]);
@@ -354,6 +355,10 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
             company: c.company,
             title: c.title,
             senderName: senderName || 'Anubhav Bagri',
+            linkedinUrl: prefs.linkedinUrl || '',
+            githubUrl: prefs.githubUrl || '',
+            portfolioUrl: prefs.portfolioUrl || '',
+            resumeUrl: prefs.resumeUrl || '',
           };
           generated = {
             subject: applyTemplate(tplSubject, vars),
@@ -396,6 +401,10 @@ export function ManualSendForm({ onEmailsReady, onContactsChange }: ManualSendFo
         const vars: Record<string, string> = {
           firstName: c.firstName, lastName: c.lastName, company: c.company,
           title: c.title, senderName: senderName || 'Anubhav Bagri',
+          linkedinUrl: prefs.linkedinUrl || '',
+          githubUrl: prefs.githubUrl || '',
+          portfolioUrl: prefs.portfolioUrl || '',
+          resumeUrl: prefs.resumeUrl || '',
         };
         emails.push({
           prospectId: c.id,

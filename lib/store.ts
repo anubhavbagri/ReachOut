@@ -13,6 +13,15 @@ interface UIPreferences {
   personTitles: string[];
   emailDelayMs: number;
   senderName: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+  resumeUrl?: string;
+  resumeAttachment?: {
+    filename: string;
+    content: string; // base64
+    contentType: string;
+  };
 }
 
 interface ReachOutStore {
@@ -65,6 +74,10 @@ export const useStore = create<ReachOutStore>()(
         personTitles: DEFAULT_PERSON_TITLES,
         emailDelayMs: 1500,
         senderName: '',
+        linkedinUrl: '',
+        githubUrl: '',
+        portfolioUrl: '',
+        resumeUrl: '',
       },
       setPrefs: (p) => set(s => ({ prefs: { ...s.prefs, ...p } })),
 

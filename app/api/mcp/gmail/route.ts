@@ -7,6 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -58,27 +60,74 @@ function encodeHeader(value: string): string {
  * - Single newlines within a paragraph → space (avoid mid-sentence <br>)
  * - Exception: trailing "Name" line in signature separated by \n → <br>
  */
+interface Attachment {
+  filename: string;
+  content: string; // base64
+  contentType: string;
+}
+
+/**
+ * Convert plain-text body to HTML preserving paragraph structure.
+ * - Double newlines (\n\n) → paragraph breaks (<p>)
+ * - Single newlines within a paragraph → space (avoid mid-sentence <br>)
+ * - Exception: trailing "Name" line in signature separated by \n → <br>
+ */
 function textToHtml(text: string): string {
-  // Escape HTML entities
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  // Split into paragraphs on double newlines BEFORE escaping so we can inspect content
+  const rawParagraphs = text.split(/\n\n+/);
 
-  // Split on double newlines (paragraph breaks)
-  const paragraphs = escaped.split(/\n\n+/);
+  const processedParagraphs = rawParagraphs.map(para => {
+    const lines = para.split('\n');
 
-  return paragraphs
-    .map(para => {
-      // For short paragraphs with a single \n (like "Thanks for considering,\nAnubhav"),
-      // preserve the break. For longer paragraphs, treat \n as a space.
-      const lines = para.split('\n');
-      const html = lines.every(l => l.length < 60)
-        ? lines.join('<br>')        // short lines (signature) → keep breaks
-        : lines.join(' ');          // long lines (prose) → join as one sentence
-      return `<p style="margin:0 0 16px 0;line-height:1.6">${html}</p>`;
-    })
-    .join('');
+    // Check if this paragraph is a bullet list block (every non-empty line starts with •)
+    const isBulletBlock = lines.every(l => l.trim() === '' || l.trim().startsWith('•'));
+
+    if (isBulletBlock) {
+      // Render as a proper HTML list
+      const items = lines
+        .filter(l => l.trim().startsWith('•'))
+        .map(l => {
+          let content = l.replace(/^[\s•]+/, '');
+          // Escape HTML entities
+          content = content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+          // Compile markdown links [text](url)
+          content = content.replace(
+            /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g,
+            '<a href="$2" style="color: #1558d6; text-decoration: underline;">$1</a>'
+          );
+          // Compile **bold**
+          content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+          return `<li style="margin:0 0 2px 0;line-height:1.6">${content}</li>`;
+        })
+        .join('');
+      return `<ul style="margin:0 0 16px 0;padding-left:24px;list-style:disc">${items}</ul>`;
+    }
+
+    // Regular paragraph — escape, compile links and bold, join lines
+    let html = lines
+      .map(l => {
+        let content = l
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        // Compile markdown links [text](url)
+        content = content.replace(
+          /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g,
+          '<a href="$2" style="color: #1558d6; text-decoration: underline;">$1</a>'
+        );
+        // Compile **bold**
+        content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return content;
+      })
+      .join('<br>');
+
+    return `<p style="margin:0 0 16px 0;line-height:1.6">${html}</p>`;
+  });
+
+  return processedParagraphs.join('');
 }
 
 /**
@@ -93,12 +142,15 @@ function encodeEmail(
   subject: string,
   body: string,
   replyMessageId?: string,
+  attachments?: Attachment[],
 ): string {
   const fromHeader = fromName
     ? `${encodeHeader(fromName)} <${from}>`
     : from;
 
   const htmlBody = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${textToHtml(body)}</body></html>`;
+
+  const boundary = `----=_Part_${Math.random().toString(36).substring(2)}`;
 
   const headers = [
     `To: ${to}`,
@@ -112,12 +164,36 @@ function encodeEmail(
     headers.push(`References: ${replyMessageId}`);
   }
 
-  headers.push(
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-  );
+  headers.push('MIME-Version: 1.0');
 
-  const message = [...headers, '', htmlBody].join('\r\n');
+  let message = '';
+  if (attachments && attachments.length > 0) {
+    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    message = [...headers, '', ''].join('\r\n');
+
+    // Body part (base64-encoded HTML — 7bit can silently fail in Gmail with attachments)
+    message += `--${boundary}\r\n`;
+    message += 'Content-Type: text/html; charset=UTF-8\r\n';
+    message += 'Content-Transfer-Encoding: base64\r\n\r\n';
+    const htmlBase64 = Buffer.from(htmlBody, 'utf-8').toString('base64').match(/.{1,76}/g)?.join('\r\n') || '';
+    message += `${htmlBase64}\r\n\r\n`;
+
+    // Attachments
+    for (const attachment of attachments) {
+      message += `--${boundary}\r\n`;
+      message += `Content-Type: ${attachment.contentType}; name="${encodeHeader(attachment.filename)}"\r\n`;
+      message += `Content-Disposition: attachment; filename="${encodeHeader(attachment.filename)}"\r\n`;
+      message += 'Content-Transfer-Encoding: base64\r\n\r\n';
+      // Chunk base64 content to 76 characters per line (RFC 2045)
+      const chunked = attachment.content.match(/.{1,76}/g)?.join('\r\n') || attachment.content;
+      message += `${chunked}\r\n\r\n`;
+    }
+
+    message += `--${boundary}--`;
+  } else {
+    headers.push('Content-Type: text/html; charset=UTF-8');
+    message = [...headers, '', htmlBody].join('\r\n');
+  }
 
   return Buffer.from(message)
     .toString('base64')
@@ -151,9 +227,26 @@ export async function POST(request: NextRequest) {
       fromEmail?: string;
       fromName?: string;
       threadId?: string;
+      attachResume?: boolean;
     };
 
-    const { to, subject, body: emailBody, fromEmail, fromName, threadId } = body;
+    const { to, subject, body: emailBody, fromEmail, fromName, threadId, attachResume } = body;
+
+    // Load resume from codebase (public/resume.pdf) if requested — works across any session/browser
+    let attachments: Attachment[] | undefined;
+    if (attachResume) {
+      try {
+        const resumePath = path.join(process.cwd(), 'public', 'resume.pdf');
+        if (fs.existsSync(resumePath)) {
+          const content = fs.readFileSync(resumePath).toString('base64');
+          attachments = [{ filename: 'Anubhav_Bagri_Resume.pdf', content, contentType: 'application/pdf' }];
+        } else {
+          console.warn('[ReachOut] resume.pdf not found in public/ — sending without attachment');
+        }
+      } catch (err) {
+        console.error('[ReachOut] Failed to read resume.pdf:', err);
+      }
+    }
 
     if (!to || !subject || !emailBody) {
       return NextResponse.json(
@@ -185,12 +278,25 @@ export async function POST(request: NextRequest) {
     // 2. Get sender's email address if not provided
     let senderEmail = fromEmail;
     if (!senderEmail) {
-      const profileRes = await fetch(
-        'https://www.googleapis.com/oauth2/v2/userinfo',
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+      try {
+        const profileRes = await fetch(
+          'https://www.googleapis.com/oauth2/v2/userinfo',
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const profile = await profileRes.json() as { email?: string; error?: unknown };
+        if (profile.error) console.error('[ReachOut] userinfo error:', profile.error);
+        senderEmail = profile.email;
+      } catch (profileErr) {
+        console.error('[ReachOut] Failed to fetch userinfo:', profileErr);
+      }
+    }
+
+    if (!senderEmail) {
+      console.error('[ReachOut] No sender email available — cannot encode message');
+      return NextResponse.json(
+        { error: 'Could not determine sender email. Reconnect Gmail in Settings.' },
+        { status: 500 }
       );
-      const profile = await profileRes.json() as { email: string };
-      senderEmail = profile.email;
     }
 
     // 3. Build and send the email
@@ -210,7 +316,7 @@ export async function POST(request: NextRequest) {
       } catch { /* proceed without threading headers */ }
     }
 
-    const raw = encodeEmail(to, senderEmail, fromName || '', subject, emailBody, replyMessageId);
+    const raw = encodeEmail(to, senderEmail, fromName || '', subject, emailBody, replyMessageId, attachments);
 
     const sendPayload: { raw: string; threadId?: string } = { raw };
     if (threadId) sendPayload.threadId = threadId;
@@ -248,11 +354,12 @@ export async function POST(request: NextRequest) {
       fromEmail: senderEmail,
     });
   } catch (error) {
-    console.error('[ReachOut] Send email error:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[ReachOut] Send email error:', msg, error);
     return NextResponse.json(
       {
         error: 'Failed to send email',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: msg,
       },
       { status: 500 }
     );

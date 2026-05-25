@@ -21,6 +21,40 @@ interface EmailPreviewProps {
   onFinish?: () => void;
 }
 
+/** Client-side mirror of the server's textToHtml — keeps preview in sync with what's sent. */
+function bodyToPreviewHtml(text: string): string {
+  const rawParagraphs = text.split(/\n\n+/);
+
+  return rawParagraphs.map(para => {
+    const lines = para.split('\n');
+    const isBulletBlock = lines.every(l => l.trim() === '' || l.trim().startsWith('•'));
+
+    const processLine = (l: string) => {
+      let s = l
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      s = s.replace(
+        /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener" style="color:#1558d6;text-decoration:underline">$1</a>'
+      );
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return s;
+    };
+
+    if (isBulletBlock) {
+      const items = lines
+        .filter(l => l.trim().startsWith('•'))
+        .map(l => `<li style="margin:0 0 2px 0;line-height:1.6">${processLine(l.replace(/^[\s•]+/, ''))}</li>`)
+        .join('');
+      return `<ul style="margin:0 0 14px 0;padding-left:22px;list-style:disc">${items}</ul>`;
+    }
+
+    const html = lines.map(processLine).join('<br>');
+    return `<p style="margin:0 0 14px 0;line-height:1.6">${html}</p>`;
+  }).join('');
+}
+
 export function EmailPreview({ emails, onEmailsChange, onFinish }: EmailPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
@@ -126,9 +160,10 @@ export function EmailPreview({ emails, onEmailsChange, onFinish }: EmailPreviewP
                 className="min-h-[300px] text-sm leading-relaxed"
               />
             ) : (
-              <div className="text-sm whitespace-pre-wrap p-4 bg-muted rounded-lg text-foreground leading-relaxed">
-                {email.body}
-              </div>
+              <div
+                className="text-sm p-4 bg-muted rounded-lg text-foreground"
+                dangerouslySetInnerHTML={{ __html: bodyToPreviewHtml(email.body) }}
+              />
             )}
           </div>
         </div>
