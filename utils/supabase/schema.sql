@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS sent_emails (
   body              TEXT NOT NULL,
   sent_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   follow_up_status  TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (follow_up_status IN ('pending', 'followed_up', 'replied', 'not_interested')),
+                    CHECK (follow_up_status IN ('pending', 'followed_up', 'replied', 'replied_positive', 'replied_negative', 'not_interested')),
   follow_up_count   INTEGER NOT NULL DEFAULT 0,
   last_follow_up_at TIMESTAMPTZ,
   notes             TEXT,
