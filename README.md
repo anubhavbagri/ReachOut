@@ -229,7 +229,7 @@ middleware.ts                # Auth gate — protects /app and /api/*
 | `subject` / `body` | text | Email content |
 | `recipient_type` | text | `HR` or `HM` |
 | `sent_at` | timestamptz | |
-| `follow_up_status` | text | `pending` / `followed_up` / `replied` / `not_interested` |
+| `follow_up_status` | text | `pending` / `followed_up` / `replied` / `replied_positive` / `replied_negative` / `not_interested` |
 | `follow_up_count` | int | Increments on each follow-up |
 | `last_follow_up_at` | timestamptz | |
 | `gmail_thread_id` | text | For direct Gmail link and thread replies |

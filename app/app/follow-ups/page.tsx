@@ -109,9 +109,9 @@ export default function FollowUpsPage() {
   };
 
   const filtered = getFilteredEmails().sort((a, b) => {
-    const compA = (a.prospectCompany || '').toLowerCase();
-    const compB = (b.prospectCompany || '').toLowerCase();
-    return compA.localeCompare(compB);
+    const timeA = new Date(a.lastFollowUpAt || a.sentAt).getTime();
+    const timeB = new Date(b.lastFollowUpAt || b.sentAt).getTime();
+    return timeB - timeA;
   });
 
   // Counts for tab badges
